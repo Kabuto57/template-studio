@@ -1,5 +1,9 @@
 // The panel beside the tool rail: Designs, Elements, Fields, Settings.
+import sampleProject from "../assets/sample_project.json";
 import sampleUrl from "../assets/sample_template.pptx?url";
+import sampleTest from "../assets/sample_test_data.json";
+import { fillXml, newReport, type Data } from "../engine/engine";
+import type { Project } from "../model/fields";
 import { fieldType } from "../model/fields";
 import { Deck } from "../ooxml/deck";
 import { BLOCKS, type BlockType } from "../ooxml/edit";
@@ -15,24 +19,26 @@ import { doInsertBlock, makeDraggable } from "./stage";
 import { S, ui } from "./state";
 
 /* ---------------------------------------------------------------- designs */
-/** Cover thumbnails are real renders of each design's first slide, built once and reused. */
+type Rules = Project["settings"]["colour_rules"];
+/** Cover thumbnails are real renders of each design's first slide, filled with its example data. Built once and reused. */
 const covers = new Map<string, Promise<HTMLElement>>();
-function cover(id: string, bytes: () => Promise<Uint8Array>): Promise<HTMLElement> {
+function cover(id: string, bytes: () => Promise<Uint8Array>, data: Data, rules: Rules): Promise<HTMLElement> {
   let p = covers.get(id);
   if (!p) {
-    p = bytes().then(b => Deck.load(b)).then(deck => renderSlide(deck, 0, { highlight: true }));
+    p = bytes().then(b => Deck.load(b)).then(deck =>
+      renderSlide(deck, 0, { xml: fillXml(deck.texts[deck.slides[0]!.path]!, data, newReport(), rules) }));
     covers.set(id, p);
   }
   return p.then(node => node.cloneNode(true) as HTMLElement);
 }
 
-function designCard(id: string, name: string, blurb: string, palette: string[], bytes: () => Promise<Uint8Array>, open: () => Promise<void>): HTMLElement {
+function designCard(id: string, name: string, blurb: string, palette: string[], bytes: () => Promise<Uint8Array>, data: Data, rules: Rules, open: () => Promise<void>): HTMLElement {
   const card = el("button", { class: "card", type: "button", "aria-current": String(S.designId === id), "data-design": id });
-  const box = el("div", { class: "thumb-box" });
+  const box = el("div", { class: "thumb-box mini" });
   card.append(box,
     el("span", { class: "name" }, `${esc(name)}<span class="dots">${palette.map(c => `<i style="background:#${c}"></i>`).join("")}</span>`),
     el("span", { class: "blurb" }, esc(blurb)));
-  cover(id, bytes).then(node => { node.inert = true; box.appendChild(node); }, () => { /* the card still works without a preview */ });
+  cover(id, bytes, data, rules).then(node => { node.inert = true; box.appendChild(node); }, () => { /* the card still works without a preview */ });
   card.addEventListener("click", () => {
     open().then(() => { ui.setView("design"); toast(`${name} opened. Your last template is under Recent.`); })
       .catch((e: Error) => toast(e.message));
@@ -46,8 +52,9 @@ function designsPanel(): HTMLElement {
   const sect = el("div", { class: "sect" });
   const grid = el("div", { class: "gallery" });
   grid.appendChild(designCard("audit", "Audit report", "Internal audit highlights", ["16253D", "2A7F8F", "EEF2F5"],
-    async () => new Uint8Array(await (await fetch(sampleUrl)).arrayBuffer()), openSample));
-  for (const d of DESIGNS) grid.appendChild(designCard(d.id, d.name, d.blurb, d.palette, () => buildDeck(d.slides), () => openDesign(d)));
+    async () => new Uint8Array(await (await fetch(sampleUrl)).arrayBuffer()),
+    sampleTest as Data, (sampleProject as Partial<Project>).settings?.colour_rules ?? [], openSample));
+  for (const d of DESIGNS) grid.appendChild(designCard(d.id, d.name, d.blurb, d.palette, () => buildDeck(d.slides), d.test as Data, d.project.settings.colour_rules, () => openDesign(d)));
   const blank = el("button", { class: "card blank", type: "button", "aria-current": String(S.designId === "blank") },
     `<div class="thumb-box">${ICON.plus}</div><span class="name">Blank</span><span class="blurb">An empty 16:9 slide</span>`);
   blank.addEventListener("click", () => { void openBlank().then(() => { ui.setView("design"); ui.setSide("elements"); toast("Blank slide ready. Add elements from the left."); }); });

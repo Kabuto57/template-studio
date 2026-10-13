@@ -153,7 +153,9 @@ textarea.inp.mono { font-size: var(--fs-xs); }
 .card .thumb-box { position: relative; border-radius: var(--r); overflow: hidden; background: var(--wash); box-shadow: 0 0 0 1px var(--line); aspect-ratio: 16 / 9; }
 .card:hover .thumb-box { box-shadow: 0 0 0 2px var(--primary); }
 .card[aria-current="true"] .thumb-box { box-shadow: 0 0 0 2px var(--primary), 0 0 0 5px var(--primary-soft); }
-.card .slide { pointer-events: none; box-shadow: none; }
+/* Miniature slides are drawn at full size and scaled down, so a browser's minimum font size cannot distort them. */
+.mini { position: relative; overflow: hidden; container-type: inline-size; aspect-ratio: var(--ar, 16 / 9); }
+.mini > .slide { position: absolute; left: 0; top: 0; width: 1280px; transform-origin: 0 0; scale: tan(atan2(100cqw, 1280px)); box-shadow: none; pointer-events: none; }
 .card .name { font-weight: 650; font-size: var(--fs-sm); display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .card .blurb { color: var(--muted); font-size: var(--fs-xs); margin-top: -4px; }
 .dots { display: inline-flex; gap: 3px; flex: none; }
@@ -242,8 +244,8 @@ button.fgroup-h:hover { color: var(--primary); }
 /* filmstrip */
 .film { flex: none; min-height: 126px; display: flex; gap: 12px; align-items: flex-start; padding: 12px 24px 14px; overflow-x: auto; background: var(--panel); border-top: 1px solid var(--line); }
 .thumb { position: relative; flex: none; width: 132px; border: 0; background: none; padding: 0; display: flex; flex-direction: column; gap: 5px; cursor: pointer; text-align: left; }
-.thumb .slide { border-radius: 5px; box-shadow: 0 0 0 1px var(--line-2); pointer-events: none; }
-.thumb[aria-current="true"] .slide { box-shadow: 0 0 0 2.5px var(--primary); }
+.thumb .mini { border-radius: 5px; box-shadow: 0 0 0 1px var(--line-2); }
+.thumb[aria-current="true"] .mini { box-shadow: 0 0 0 2.5px var(--primary); }
 .thumb .no { font-size: var(--fs-xs); color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
 .thumb[aria-current="true"] .no { color: var(--primary); }
 .thumb-acts { position: absolute; right: 4px; top: 4px; display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: rgba(255, 255, 255, .95); box-shadow: var(--shadow-1), 0 0 0 1px var(--line); opacity: 0; }

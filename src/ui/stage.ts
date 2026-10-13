@@ -69,7 +69,9 @@ function renderFilm(filled: Record<string, string> | null): void {
     catch { sl = el("div", { class: "slide", style: `aspect-ratio:${deck.W}/${deck.H}` }); }
     sl.setAttribute("aria-hidden", "true");
     sl.inert = true; // a picture of the slide, not content to read or tab into
-    b.append(sl, el("span", { class: "no" }, `<span class="sr">Slide </span>${i + 1}`));
+    const mini = el("div", { class: "mini" });
+    mini.appendChild(sl);
+    b.append(mini, el("span", { class: "no" }, `<span class="sr">Slide </span>${i + 1}`));
     if (design) {
       const last = deck.slides.length - 1;
       b.appendChild(el("div", { class: "thumb-acts" },
