@@ -1,0 +1,9 @@
+node_modules
+dist
+public/pptx_kit.py
+test-results
+playwright-report
+tests/py/out
+__pycache__
+.DS_Store
+*.log

@@ -1,0 +1,103 @@
+{
+  "name": "Audit Report Highlights",
+  "settings": {
+    "file_name_field": "report_title",
+    "colour_rules": [
+      {
+        "match": "High",
+        "fill": "FADBD8",
+        "text": "A93226"
+      },
+      {
+        "match": "Medium",
+        "fill": "FCEBCF",
+        "text": "9C640C"
+      },
+      {
+        "match": "Low",
+        "fill": "D9F2E3",
+        "text": "1E7A46"
+      }
+    ]
+  },
+  "fields": {
+    "report_title": {
+      "desc": "Short title of the audit",
+      "max": 6,
+      "example": "Procurement Process Audit"
+    },
+    "entity_name": {
+      "desc": "Company or business unit audited",
+      "example": "ABC Holdings Pte Ltd"
+    },
+    "audit_period": {
+      "desc": "Period the audit covers",
+      "example": "1 Jan 2026 - 30 Jun 2026"
+    },
+    "report_date": {
+      "desc": "Date of the report",
+      "example": "7 October 2026"
+    },
+    "prepared_by": {
+      "desc": "Team that prepared the report",
+      "example": "Internal Audit Department"
+    },
+    "confidentiality": {
+      "desc": "Confidentiality label",
+      "example": "Confidential - for Audit Committee use only"
+    },
+    "overall_rating": {
+      "desc": "Overall audit rating",
+      "allowed": "Satisfactory, Needs Improvement, Unsatisfactory"
+    },
+    "executive_summary": {
+      "desc": "What was reviewed and the overall conclusion",
+      "max": 60,
+      "example": "Internal Audit reviewed the procurement-to-payment process across three business units. Controls are generally in place, but weaknesses in PO approval and contract monitoring expose the company to unauthorised spending."
+    },
+    "key_highlights": {
+      "type": "list",
+      "desc": "Most important observations, good and bad",
+      "max": 12,
+      "example": "12% of purchase orders were approved after the invoice date\n3 active vendors had no valid contract on file\nPayment approval controls operated effectively"
+    },
+    "audit_scope": {
+      "desc": "Processes and locations covered",
+      "max": 35,
+      "example": "Vendor onboarding, PO approval, contract management, invoice matching and payments for Singapore, Malaysia and Thailand."
+    },
+    "conclusion": {
+      "desc": "Management response and follow-up",
+      "max": 30,
+      "example": "Management has agreed to all recommendations. Internal Audit will follow up on high-risk findings in Q1 2027."
+    },
+    "findings[]": {
+      "desc": "most important first"
+    },
+    "findings[].title": {
+      "desc": "What was found",
+      "max": 15,
+      "example": "Purchase orders raised after goods were received\nExpired vendor contracts still in active use\nUsers can both create vendors and approve payments"
+    },
+    "findings[].risk": {
+      "desc": "Risk rating",
+      "allowed": "High, Medium, Low",
+      "example": "High\nHigh\nMedium"
+    },
+    "findings[].recommendation": {
+      "desc": "What management should do",
+      "max": 20,
+      "example": "Block invoices without an approved PO\nSet contract expiry alerts 90 days ahead\nRemove conflicting access; review quarterly"
+    },
+    "findings[].owner": {
+      "desc": "Person or team responsible",
+      "max": 3,
+      "example": "Head of Procurement\nLegal & Procurement\nIT Security"
+    },
+    "findings[].due_date": {
+      "desc": "Target date",
+      "example": "31 Dec 2026\n30 Nov 2026\n31 Oct 2026"
+    }
+  },
+  "prompt_extra": ""
+}

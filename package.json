@@ -1,0 +1,28 @@
+{
+  "name": "template-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Turn a PowerPoint template into the prompt, JSON schema and Python code an LLM needs to fill it. Runs entirely in the browser.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:py": "python3 tests/py/run_all.py",
+    "test:e2e": "playwright test",
+    "test:all": "npm run typecheck && npm test && npm run build && npm run test:py && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@fontsource-variable/figtree": "^5.3.0",
+    "@playwright/test": "^1.64.0",
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "^26.6.5",
+    "jsdom": "^29.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^4.1.11"
+  }
+}

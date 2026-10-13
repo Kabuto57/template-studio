@@ -1,0 +1,48 @@
+{
+  "report_title": "Procurement Process Audit",
+  "entity_name": "ABC Holdings Pte Ltd",
+  "audit_period": "1 Jan 2026 - 30 Jun 2026",
+  "report_date": "7 October 2026",
+  "prepared_by": "Internal Audit Department",
+  "confidentiality": "Confidential - for Audit Committee use only",
+  "overall_rating": "Needs Improvement",
+  "executive_summary": "Internal Audit reviewed the procurement-to-payment process across three business units. Controls over vendor onboarding and payment approval are generally in place, but weaknesses in purchase order approval and contract monitoring expose the company to unauthorised spending and overpayment risk.",
+  "key_highlights": [
+    "12% of purchase orders were approved after the invoice date",
+    "3 active vendors had no valid contract on file",
+    "Segregation of duties conflicts found in 2 user roles",
+    "Payment approval controls operated effectively for all samples tested"
+  ],
+  "audit_scope": "Vendor onboarding, purchase requisition and PO approval, contract management, invoice matching and payment processing for Singapore, Malaysia and Thailand units.",
+  "findings": [
+    {
+      "title": "Purchase orders raised after goods or services were received",
+      "risk": "High",
+      "recommendation": "Enforce system block on invoices without an approved PO; report exceptions monthly",
+      "owner": "Head of Procurement",
+      "due_date": "31 Dec 2026"
+    },
+    {
+      "title": "Expired vendor contracts still in active use",
+      "risk": "High",
+      "recommendation": "Set up contract expiry alerts 90 days ahead and review the active vendor list quarterly",
+      "owner": "Legal & Procurement",
+      "due_date": "30 Nov 2026"
+    },
+    {
+      "title": "Users able to both create vendors and approve payments",
+      "risk": "Medium",
+      "recommendation": "Remove conflicting access and run a quarterly user access review",
+      "owner": "IT Security",
+      "due_date": "31 Oct 2026"
+    },
+    {
+      "title": "Three-way match tolerance set higher than policy",
+      "risk": "Low",
+      "recommendation": "Align system tolerance to the 2% limit in the procurement policy",
+      "owner": "Finance Systems",
+      "due_date": "31 Dec 2026"
+    }
+  ],
+  "conclusion": "Management has agreed to all recommendations. Internal Audit will follow up on the two high-risk findings in Q1 2027."
+}

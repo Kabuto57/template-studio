@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Template Studio</title>
+  <meta name="description" content="Design a PowerPoint template, then get the prompt, JSON schema and Python code an LLM needs to fill it. Free, and your files never leave your browser.">
+  <meta name="theme-color" content="#171A2B">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="./manifest.webmanifest">
+</head>
+<body>
+  <a class="skip" href="#stage">Skip to the slide</a>
+  <div class="app" id="app" data-view="design">
+    <header class="top">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="6" width="28" height="20" rx="4" fill="#2B50ED"/><rect x="7" y="11" width="11" height="3" rx="1.5" fill="#fff"/><rect x="7" y="17" width="18" height="4.5" rx="2.25" fill="#F2A300"/></svg>
+        <span class="brand-name">Template Studio</span>
+      </div>
+      <input id="projName" class="doc-name" type="text" spellcheck="false" aria-label="Template name" autocomplete="off">
+      <span class="saved" id="savedNote" role="status"></span>
+      <nav class="steps" role="tablist" aria-label="Steps">
+        <button type="button" role="tab" data-view="design" aria-selected="true"><span class="n">1</span>Design</button>
+        <button type="button" role="tab" data-view="test" aria-selected="false"><span class="n">2</span>Test</button>
+        <button type="button" role="tab" data-view="code" aria-selected="false"><span class="n">3</span>Get code</button>
+      </nav>
+      <div class="top-actions">
+        <button class="icon-btn" id="undoBtn" type="button" disabled title="Undo (Ctrl+Z)" aria-label="Undo">
+          <svg viewBox="0 0 20 20"><path d="M7.5 5 4 8.5 7.5 12"/><path d="M4.5 8.5H12a4 4 0 0 1 0 8H9"/></svg>
+        </button>
+        <button class="icon-btn" id="redoBtn" type="button" disabled title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
+          <svg viewBox="0 0 20 20"><path d="M12.5 5 16 8.5 12.5 12"/><path d="M15.5 8.5H8a4 4 0 0 0 0 8h3"/></svg>
+        </button>
+        <button class="icon-btn" id="aboutBtn" type="button" title="About and privacy" aria-label="About and privacy">
+          <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.2"/><path d="M10 9.2v4.3M10 6.4v.2"/></svg>
+        </button>
+        <button class="btn primary" id="kitBtn" type="button">Download kit</button>
+      </div>
+    </header>
+
+    <nav class="rail" id="rail" aria-label="Tools">
+      <button type="button" data-side="templates" aria-pressed="true">
+        <svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="7.5" height="7" rx="1.6"/><rect x="13" y="4" width="7.5" height="7" rx="1.6"/><rect x="3.5" y="13" width="7.5" height="7" rx="1.6"/><rect x="13" y="13" width="7.5" height="7" rx="1.6"/></svg>
+        <span>Designs</span>
+      </button>
+      <button type="button" data-side="elements" aria-pressed="false">
+        <svg viewBox="0 0 24 24"><rect x="3.5" y="12.5" width="8" height="8" rx="1.6"/><circle cx="16.8" cy="16.5" r="4"/><path d="M12 3.5 16.2 10H7.8z"/></svg>
+        <span>Elements</span>
+      </button>
+      <button type="button" data-side="fields" aria-pressed="false">
+        <svg viewBox="0 0 24 24"><path d="M8.5 4.5c-2 0-2.5 1-2.5 2.6v2.2c0 1.4-.7 2.2-2 2.7 1.3.5 2 1.3 2 2.7v2.2c0 1.6.5 2.6 2.5 2.6M15.5 4.5c2 0 2.5 1 2.5 2.6v2.2c0 1.4.7 2.2 2 2.7-1.3.5-2 1.3-2 2.7v2.2c0 1.6-.5 2.6-2.5 2.6"/></svg>
+        <span>Fields</span>
+      </button>
+      <button type="button" data-side="settings" aria-pressed="false">
+        <svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+        <span>Settings</span>
+      </button>
+      <span class="rail-gap"></span>
+      <button type="button" id="openBtn">
+        <svg viewBox="0 0 24 24"><path d="M12 15.5V4.5M7.5 9 12 4.5 16.5 9M4.5 15.5v2.5a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-2.5"/></svg>
+        <span>Open file</span>
+      </button>
+    </nav>
+
+    <aside class="side" id="side" aria-label="Tool panel"></aside>
+
+    <main class="stage" id="stage" tabindex="-1" aria-label="Slide">
+      <div class="stage-bar"><span id="stageHint"></span><span id="stageMeta"></span></div>
+      <div class="slide-host" id="slideHost"></div>
+      <div class="film" id="film" aria-label="Slides"></div>
+    </main>
+
+    <aside class="insp" id="insp" aria-label="Inspector"></aside>
+    <section class="code-page" id="codePage" hidden></section>
+  </div>
+
+  <input id="fileInput" type="file" accept=".pptx,.py,.txt" hidden>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <dialog class="dialog" id="aboutDialog" aria-labelledby="aboutTitle"></dialog>
+  <noscript>Template Studio needs JavaScript. It runs entirely in your browser; nothing is uploaded.</noscript>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
