@@ -90,7 +90,10 @@ describe("the audit sample", () => {
     const prompt = () => buildPrompt(sampleProject, model());
 
     it("match the prototype's pptx_kit.py (golden reference)", () => {
-      const kit = runKit("golden_prototype", read(ROOT, "reference/built/pptx_kit.py"));
+      // The prototype calls Path.write_text(newline=...), which only exists from Python 3.10 although it
+      // promises 3.8. Drop that one argument so the reference also runs on 3.8; on Linux and macOS the
+      // files it writes are identical either way.
+      const kit = runKit("golden_prototype", read(ROOT, "reference/built/pptx_kit.py").replace('encoding="utf-8", newline="\\n")', 'encoding="utf-8")'));
       expect(example() + "\n").toBe(read(kit, "example_body.json"));
       expect(schema() + "\n").toBe(read(kit, "json_schema.json"));
       expect(prompt() + "\n").toBe(read(kit, "llm_prompt.txt"));
@@ -352,5 +355,5 @@ describe("every .pptx written by these tests", () => {
     const out = py(["tests/py/check_pptx.py", ...new Set(written)]);
     expect(out).not.toContain("FAIL");
     console.log(out.trim().split("\n").pop());
-  });
+  }, 600_000); // LibreOffice converts each file to PDF in CI, which takes a while
 });

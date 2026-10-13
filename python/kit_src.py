@@ -543,7 +543,11 @@ def build(template, quiet=False):
     (kit / "fields.json").write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     example = build_example(project, model)
-    write = lambda name, text: (kit / name).write_text(text, encoding="utf-8", newline="\n")
+    def write(name, text):
+        # open() rather than Path.write_text(newline=...): that argument needs Python 3.10
+        with open(kit / name, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+
     write("example_body.json", json.dumps(example, indent=2, ensure_ascii=False) + "\n")
     write("json_schema.json", json.dumps(build_schema(project, model), indent=2, ensure_ascii=False) + "\n")
     write("llm_prompt.txt", build_prompt(project, model) + "\n")
