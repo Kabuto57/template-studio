@@ -68,7 +68,8 @@ def check(path):
                 _ = shape.shape_type, shape.has_text_frame and shape.text_frame.text
     if SOFFICE:
         with tempfile.TemporaryDirectory() as tmp:
-            subprocess.run([SOFFICE, "--headless", "--convert-to", "pdf", "--outdir", tmp, path],
+            # its own profile folder, so checks running in parallel do not fight over one
+            subprocess.run([SOFFICE, "-env:UserInstallation=file://%s/profile" % tmp, "--headless", "--convert-to", "pdf", "--outdir", tmp, path],
                            check=True, capture_output=True, timeout=180)
             pdf = os.path.join(tmp, os.path.splitext(os.path.basename(path))[0] + ".pdf")
             assert os.path.getsize(pdf) > 1000, "LibreOffice produced no PDF"
