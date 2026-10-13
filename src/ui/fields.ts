@@ -119,6 +119,7 @@ export function fieldEditor(cfgKey: string): HTMLElement {
     ui.refresh();
     toast(`Renamed to ${v}`);
   });
+  name.addEventListener("keydown", e => { if (e.key === "Enter") name.blur(); });
   const head = el("div", { class: "row tight" });
   head.appendChild(name);
   if (entry) {

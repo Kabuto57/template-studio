@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The generated code promises Python 3.8+. 3.12 also runs the browser tests and LibreOffice.
+        python: ["3.8", "3.12"]
+    env:
+      PYTHON: python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: npm ci
+      - run: npm run typecheck
+
+      # python-pptx and LibreOffice only check the files the product writes; the product never uses them.
+      - name: Install .pptx checkers
+        if: matrix.python == '3.12'
+        run: |
+          python -m pip install --quiet python-pptx
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends libreoffice-impress
+          echo "REQUIRE_PPTX_TOOLS=1" >> "$GITHUB_ENV"
+
+      - name: Unit, parity, golden and Python tests
+        run: npm test
+      - run: npm run build
+
+      - name: Browser tests
+        if: matrix.python == '3.12'
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+      - name: Check every .pptx the tests wrote
+        if: matrix.python == '3.12'
+        run: npm run test:py
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-output-py${{ matrix.python }}
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+      - uses: actions/upload-pages-artifact@v3
+        if: matrix.python == '3.12' && github.ref == 'refs/heads/main'
+        with:
+          path: dist
+      - uses: actions/upload-artifact@v4
+        if: matrix.python == '3.12'
+        with:
+          name: pptx_kit
+          path: dist/pptx_kit.py
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  release:
+    name: Release pptx_kit.py
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pptx_kit
+      - run: gh release create "$GITHUB_REF_NAME" pptx_kit.py --repo "$GITHUB_REPOSITORY" --title "Template Studio $GITHUB_REF_NAME" --notes "pptx_kit.py builds the same kit as the web app from a .pptx, with plain Python 3.8+ and no installs. Run \`python pptx_kit.py\` next to your template."
+        env:
+          GH_TOKEN: ${{ github.token }}

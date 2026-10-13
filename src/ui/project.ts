@@ -20,6 +20,7 @@ interface OpenArgs { bytes: Uint8Array; project?: Partial<Project> | null; name?
 
 export async function openProject(a: OpenArgs): Promise<void> {
   const deck = await Deck.load(a.bytes); // throws before anything is replaced if the file is bad
+  if (S.deck) await saveNow(); // keep the outgoing template's latest state under Recent
   S.deck?.dispose();
   S.deck = deck;
   S.project = normaliseProject(a.project, a.name);

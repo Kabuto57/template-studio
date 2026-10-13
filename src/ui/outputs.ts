@@ -1,7 +1,7 @@
 // The Test panel (paste LLM JSON, see the slides fill) and the Get code page.
 import { reportableMissing } from "../engine/engine";
 import { buildExample, buildPrompt, buildSchema, rootOf } from "../model/fields";
-import { DIFY_STRING_LIMIT, displayPython } from "../model/python";
+import { DIFY_STRING_LIMIT, DIFY_STRING_LIMIT_OLD, displayPython } from "../model/python";
 import { b64ToBytes, esc } from "../ooxml/xml";
 import { $, ICON, copyText, debounce, download, el, safeName, toast } from "./dom";
 import { currentPython, downloadFilled, downloadKit, downloadTemplate, exampleText, filledBytes } from "./project";
@@ -170,15 +170,16 @@ const renderPython = debounce(() => {
       out.textContent = displayPython(code);
       // What Dify will be handed back: the filled deck, base64-encoded (4 characters per 3 bytes).
       const outChars = Math.ceil((await filledBytes(buildExample(S.project, S.model))).length / 3) * 4;
-      const over = outChars > DIFY_STRING_LIMIT;
+      const over = outChars > DIFY_STRING_LIMIT, tight = outChars > DIFY_STRING_LIMIT_OLD;
       const meter = $("#pyMeter");
       meter.classList.toggle("over", over);
       meter.querySelector<HTMLElement>("i")!.style.width = `${Math.min(100, outChars / DIFY_STRING_LIMIT * 100)}%`;
       const kb = (new Blob([code]).size / 1024).toFixed(0);
-      meta.innerHTML = `<b>fill_pptx.py</b> is ${kb} KB. Its <code>pptx_base64</code> output is about ${outChars.toLocaleString()} characters` +
-        (over
-          ? `, over the ${DIFY_STRING_LIMIT.toLocaleString()} a self-hosted Dify allows by default. Raise <code>CODE_MAX_STRING_LENGTH</code> in Dify's settings, or remove large pictures from the template.`
-          : `, within the ${DIFY_STRING_LIMIT.toLocaleString()} a self-hosted Dify allows by default.`);
+      const limit = DIFY_STRING_LIMIT.toLocaleString(), old = DIFY_STRING_LIMIT_OLD.toLocaleString();
+      meta.innerHTML = `<b>fill_pptx.py</b> is ${kb} KB. Its <code>pptx_base64</code> output is about ${outChars.toLocaleString()} characters. ` +
+        (over ? `That is over Dify's default limit of ${limit}. Raise <code>CODE_MAX_STRING_LENGTH</code> in Dify's environment, or remove large pictures from the template.`
+          : tight ? `That fits Dify's default limit of ${limit}. Older self-hosted versions allow ${old}; raise <code>CODE_MAX_STRING_LENGTH</code> there.`
+            : `That fits Dify's Code node limit (${limit} by default, ${old} on older versions).`);
     } catch (e) {
       if (meta) meta.textContent = "Couldn't build the code: " + (e as Error).message;
     }

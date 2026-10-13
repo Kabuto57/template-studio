@@ -4,8 +4,12 @@ import ENGINE_PY from "../../python/engine.py?raw";
 import { describe, fieldType, projectForCode, type Model, type Project } from "./fields";
 
 const SPLIT_MARKER = "# =========================================================================== command line";
-/** Self-hosted Dify rejects Code node string outputs longer than this by default (CODE_MAX_STRING_LENGTH). */
-export const DIFY_STRING_LIMIT = 80000;
+/**
+ * Dify rejects Code node string outputs longer than CODE_MAX_STRING_LENGTH. The default is
+ * 400,000 characters in current releases and was 80,000 in older self-hosted ones.
+ */
+export const DIFY_STRING_LIMIT = 400_000;
+export const DIFY_STRING_LIMIT_OLD = 80_000;
 
 export const isoDate = (d = new Date()): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

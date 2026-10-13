@@ -14,5 +14,5 @@ self.addEventListener("activate", event => {
 });
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET" || new URL(event.request.url).origin !== location.origin) return;
-  event.respondWith(caches.match(event.request, { ignoreSearch: true }).then(hit => hit || fetch(event.request)));
+  event.respondWith(caches.match(event.request, { ignoreSearch: true, ignoreVary: true }).then(hit => hit || fetch(event.request)));
 });
