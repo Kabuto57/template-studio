@@ -20,7 +20,7 @@ function templateColours(): string[] {
       count.set(c, (count.get(c) ?? 0) + 1);
     }
   }
-  return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 9).map(e => e[0]);
+  return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 7).map(e => e[0]); // seven fit on one row beside the picker
 }
 
 function colourControl(label: string, value: string | null, onPick: (hex: string | null) => void, allowNone = false): HTMLElement {

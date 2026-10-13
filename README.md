@@ -121,6 +121,8 @@ npm run test:e2e     # browser tests against the production build (first run: np
 npm run test:py      # structural check of every .pptx the tests wrote
 ```
 
+A full walkthrough of the code is in [docs/Template-Studio-Guide.pdf](docs/Template-Studio-Guide.pdf)
+(source: [docs/GUIDE.md](docs/GUIDE.md), rebuilt with `node scripts/guide-pdf.mjs`).
 What the tests cover is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#tests). A three-minute
 demo script is in [docs/DEMO.md](docs/DEMO.md).
 
