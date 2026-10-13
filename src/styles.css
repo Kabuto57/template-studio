@@ -9,7 +9,7 @@
   --rail-ink: #A9AEC6;
   --ink: #14172A;
   --ink-2: #41465C;
-  --muted: #666C83;
+  --muted: #575D75;
   --line: #E2E5EC;
   --line-2: #CDD2DD;
   --wash: #F4F5F8;
@@ -43,6 +43,7 @@ h1, h2, h3 { font-weight: 650; letter-spacing: -.01em; }
 code, .mono { font-family: var(--mono); font-size: .92em; }
 svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 6px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .skip { position: absolute; left: 8px; top: -60px; z-index: 100; background: var(--ink); color: #fff; padding: 8px 12px; border-radius: var(--r); }
 .skip:focus { top: 8px; }
 
@@ -217,7 +218,8 @@ button.fgroup-h:hover { color: var(--primary); }
 .slide .para { white-space: pre-wrap; overflow-wrap: break-word; }
 .slide table { position: absolute; border-collapse: collapse; table-layout: fixed; }
 .slide td { padding: 0; vertical-align: top; }
-.slide .ph { white-space: nowrap; background: rgba(242, 163, 0, .24); box-shadow: inset 0 0 0 1px rgba(214, 138, 0, .7); border-radius: .28em; padding: 0 .22em; color: inherit; }
+/* A field token looks the same on any slide colour, so it always reads as "the LLM fills this". */
+.slide .ph { white-space: nowrap; background: #FFE49A; box-shadow: inset 0 0 0 1px #D99200; border-radius: .28em; padding: 0 .22em; color: #3A2600; }
 .slide.editable [data-obj] { cursor: move; }
 .slide.editable [data-obj]:hover { outline: 1.5px solid rgba(43, 80, 237, .55); }
 .slide.editable td.hit:hover { outline: 1.5px solid rgba(43, 80, 237, .6); outline-offset: -1px; }
@@ -238,7 +240,7 @@ button.fgroup-h:hover { color: var(--primary); }
 .stage.file-over .slide-host { outline: 2px dashed var(--primary); outline-offset: -10px; border-radius: 16px; }
 
 /* filmstrip */
-.film { flex: none; display: flex; gap: 12px; align-items: flex-start; padding: 12px 24px 14px; overflow-x: auto; background: var(--panel); border-top: 1px solid var(--line); }
+.film { flex: none; min-height: 126px; display: flex; gap: 12px; align-items: flex-start; padding: 12px 24px 14px; overflow-x: auto; background: var(--panel); border-top: 1px solid var(--line); }
 .thumb { position: relative; flex: none; width: 132px; border: 0; background: none; padding: 0; display: flex; flex-direction: column; gap: 5px; cursor: pointer; text-align: left; }
 .thumb .slide { border-radius: 5px; box-shadow: 0 0 0 1px var(--line-2); pointer-events: none; }
 .thumb[aria-current="true"] .slide { box-shadow: 0 0 0 2.5px var(--primary); }
@@ -332,7 +334,7 @@ table.io th { font-weight: 600; color: var(--muted); font-size: var(--fs-xs); }
   .rail-gap { display: none; }
   .side, .insp { border: 0; border-top: 1px solid var(--line); overflow: visible; }
   .side { order: 3; } .stage { order: 2; } .insp { order: 4; }
-  .slide-host { container-type: inline-size; padding: 12px; flex: none; }
+  .slide-host { container-type: inline-size; padding: 12px; flex: none; min-height: calc((100vw - 24px) * 9 / 16 + 24px); }
   .slide-host > .slide { width: 100%; }
   .stage-bar { padding: 10px 12px 0; }
   .film { padding: 10px 12px; }

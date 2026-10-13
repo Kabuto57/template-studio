@@ -63,11 +63,13 @@ function renderFilm(filled: Record<string, string> | null): void {
   film.style.setProperty("--ar", String(deck.W / deck.H));
   film.replaceChildren();
   deck.slides.forEach((s, i) => {
-    const b = el("div", { class: "thumb", role: "button", tabindex: 0, "aria-label": `Slide ${i + 1}`, "aria-current": String(i === S.cur) });
+    const b = el("div", { class: "thumb", role: "button", tabindex: 0, "aria-current": String(i === S.cur) });
     let sl: HTMLElement;
     try { sl = renderSlide(deck, i, { xml: filled?.[s.path], highlight: !filled }); }
     catch { sl = el("div", { class: "slide", style: `aspect-ratio:${deck.W}/${deck.H}` }); }
-    b.append(sl, el("span", { class: "no" }, String(i + 1)));
+    sl.setAttribute("aria-hidden", "true");
+    sl.inert = true; // a picture of the slide, not content to read or tab into
+    b.append(sl, el("span", { class: "no" }, `<span class="sr">Slide </span>${i + 1}`));
     if (design) {
       const last = deck.slides.length - 1;
       b.appendChild(el("div", { class: "thumb-acts" },

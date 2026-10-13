@@ -448,6 +448,7 @@ class Painter {
     const b = applyTf(tf, b0);
     const cols = kids(kid(tbl, "tblGrid"), "gridCol").map(c => num(c.getAttribute("w")));
     const table = document.createElement("table");
+    table.setAttribute("role", "presentation"); // drawn for position, like every other shape
     if (ctx.curObj !== undefined) table.dataset.obj = String(ctx.curObj);
     table.style.left = this.u(b.x);
     table.style.top = this.u(b.y);

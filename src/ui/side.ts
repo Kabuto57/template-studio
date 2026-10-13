@@ -32,7 +32,7 @@ function designCard(id: string, name: string, blurb: string, palette: string[], 
   card.append(box,
     el("span", { class: "name" }, `${esc(name)}<span class="dots">${palette.map(c => `<i style="background:#${c}"></i>`).join("")}</span>`),
     el("span", { class: "blurb" }, esc(blurb)));
-  cover(id, bytes).then(node => box.appendChild(node), () => { /* the card still works without a preview */ });
+  cover(id, bytes).then(node => { node.inert = true; box.appendChild(node); }, () => { /* the card still works without a preview */ });
   card.addEventListener("click", () => {
     open().then(() => { ui.setView("design"); toast(`${name} opened. Your last template is under Recent.`); })
       .catch((e: Error) => toast(e.message));
