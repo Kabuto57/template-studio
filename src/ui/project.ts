@@ -7,7 +7,7 @@ import { buildExample, buildModel, buildPrompt, buildSchema, humanize, normalise
 import { buildPython, parsePythonFile } from "../model/python";
 import { Deck } from "../ooxml/deck";
 import { b64ToBytes, bytesToB64 } from "../ooxml/xml";
-import { loadCurrent, newDocId, saveCurrent, type SavedDoc } from "../persist/db";
+import { forgetEverything, loadCurrent, newDocId, saveCurrent, type SavedDoc } from "../persist/db";
 import { buildDeck, loadBlank, type Design } from "../templates/builder";
 import { Zip } from "../zip/minizip";
 import { $, debounce, download, safeName, toast } from "./dom";
@@ -59,9 +59,12 @@ export async function restoreOrSample(): Promise<void> {
   await openSample();
 }
 
+const MAX_FILE = 100 * 1024 * 1024;
+
 export async function openFile(file: File): Promise<void> {
   const base = file.name.replace(/\.[^.]+$/, "");
   try {
+    if (file.size > MAX_FILE) throw new Error("That file is over 100 MB. Template Studio opens templates up to 100 MB.");
     if (/\.pptx$/i.test(file.name)) {
       await openProject({ bytes: new Uint8Array(await file.arrayBuffer()), name: humanize(base) });
       toast(S.model.entries.length ? `Opened ${file.name}. Its fields are in the Fields panel.` : `Opened ${file.name}. Drag fields onto its text boxes.`);
@@ -80,8 +83,16 @@ export async function openFile(file: File): Promise<void> {
 /* ---------------------------------------------------------------- autosave */
 const savedNote = (text: string) => { const n = document.getElementById("savedNote"); if (n) n.textContent = text; };
 
+let wiping = false;
+/** Remove everything stored in this browser and start again from the sample. */
+export async function wipeAll(): Promise<void> {
+  wiping = true; // a pending autosave must not put the template straight back
+  await forgetEverything();
+  location.reload();
+}
+
 export async function saveNow(): Promise<void> {
-  if (!S.deck) return;
+  if (!S.deck || wiping) return;
   try {
     await saveCurrent({
       id: S.docId, name: S.project.name, bytes: await S.deck.bytes(), project: S.project,

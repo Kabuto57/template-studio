@@ -41,9 +41,28 @@ function offlinePlugin(): Plugin {
   };
 }
 
+/**
+ * Content Security Policy for the built site. Scripts, fonts and requests may only come from the site
+ * itself, so even if hostile markup reached the page it could neither run nor send data anywhere.
+ * (Inline style attributes are allowed: the slide renderer positions shapes with them.)
+ */
+const CSP = [
+  "default-src 'none'", "script-src 'self'", "style-src 'self' 'unsafe-inline'", "img-src 'self' blob: data:",
+  "font-src 'self'", "connect-src 'self'", "manifest-src 'self'", "worker-src 'self'",
+  "base-uri 'none'", "form-action 'none'", "object-src 'none'",
+].join("; ");
+function cspPlugin(): Plugin {
+  return {
+    name: "csp",
+    apply: "build", // the dev server needs inline scripts and a websocket for hot reload
+    transformIndexHtml: html => html.replace("<head>",
+      `<head>\n  <meta http-equiv="Content-Security-Policy" content="${CSP}">\n  <meta name="referrer" content="no-referrer">`),
+  };
+}
+
 export default defineConfig({
   base: "./", // relative, so the same build works on GitHub Pages, Cloudflare Pages, Netlify or a file server
-  plugins: [kitPlugin(), offlinePlugin()],
+  plugins: [kitPlugin(), cspPlugin(), offlinePlugin()],
   define: { __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? "dev") },
   build: { target: "es2022", assetsInlineLimit: 0 },
   test: { include: ["tests/unit/**/*.test.ts"] },

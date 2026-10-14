@@ -353,3 +353,41 @@ test("phone width: panels stack and nothing scrolls sideways", async ({ page }) 
     expect(overflow, `${view} view scrolls sideways`).toBeLessThanOrEqual(1);
   }
 });
+
+test("security: a strict content policy, hostile text stays text, and saved data can be removed", async ({ page }) => {
+  const violations: string[] = [];
+  page.on("console", m => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
+  await open(page);
+  const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content");
+  expect(csp).toContain("default-src 'none'");
+  expect(csp).toContain("script-src 'self'");
+  expect(csp).toContain("connect-src 'self'");
+
+  // Markup typed as a template name, a field description and test data must never become elements.
+  const evil = `"><img src=x onerror="window.__pwned=1"><script>window.__pwned=1</script>`;
+  await page.fill("#projName", evil);
+  await page.click("#rail [data-side=fields]");
+  await page.locator(".chip").first().click();
+  await page.locator('.field-card input[placeholder="What should go here?"]').first().fill(evil);
+  await page.click(".steps [data-view=test]");
+  await page.fill("#testJson", JSON.stringify({ report_title: evil, [evil]: evil }));
+  await expect(page.locator("#testStatus")).toContainText("not in the template");
+  await page.click(".steps [data-view=code]");
+  await expect(page.locator("#pyOut")).toContainText("def main");
+  await page.click(".steps [data-view=design]");
+  await page.click("#rail [data-side=templates]");
+  await page.waitForTimeout(700); // autosave, so the name also reaches the Recent list on reload
+  await page.reload();
+  await expect(page.locator("#projName")).toHaveValue(evil);
+  expect(await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined();
+  expect(await page.locator("img[src=x]").count()).toBe(0);
+  expect(violations).toEqual([]); // the app itself never trips its own policy
+
+  // Removing saved data brings back the sample and leaves nothing behind.
+  await page.click("#rail [data-side=settings]");
+  await page.click("#wipeBtn");
+  await page.click("#wipeBtn");
+  await expect(page.locator("#projName")).toHaveValue("Audit Report Highlights");
+  await page.click("#rail [data-side=templates]");
+  await expect(page.locator(".recent-row")).toHaveCount(0);
+});

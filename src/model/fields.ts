@@ -228,6 +228,12 @@ export function projectForCode(project: Project): Omit<Project, "pending"> {
   return { name: project.name, settings: project.settings, fields: project.fields, prompt_extra: project.prompt_extra || "" };
 }
 
+/** A colour from a file someone else may have written: six hex digits or the fallback, nothing else. */
+const hex = (v: unknown, fallback: string): string => {
+  const s = String(v ?? "").replace("#", "").toUpperCase();
+  return /^[0-9A-F]{6}$/.test(s) ? s : fallback;
+};
+
 export function normaliseProject(p: Partial<Project> | null | undefined, fallbackName?: string): Project {
   const src = (p ? JSON.parse(JSON.stringify(p)) : {}) as Partial<Project> & Record<string, unknown>;
   const rules = src.settings?.colour_rules ?? [];
@@ -237,8 +243,8 @@ export function normaliseProject(p: Partial<Project> | null | undefined, fallbac
       file_name_field: src.settings?.file_name_field ?? "",
       colour_rules: rules.map(r => ({
         match: r.match || "",
-        fill: String(r.fill || "FFFFFF").replace("#", "").toUpperCase(),
-        text: String(r.text || "000000").replace("#", "").toUpperCase(),
+        fill: hex(r.fill, "FFFFFF"),
+        text: hex(r.text, "000000"),
       })),
     },
     fields: src.fields ?? {},

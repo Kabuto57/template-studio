@@ -350,7 +350,31 @@ checks that its output equals the web app's output exactly.
 - `src/sw.js` caches the app's files on first visit. The list of files is generated at build time.
 - A browser test fails the build if the page makes any network request after loading.
 
-# 13. Tests
+# 13. Security
+
+The full statement is in `SECURITY.md`. In short:
+
+| Threat | Defence |
+|---|---|
+| A hostile `.pptx` is opened | Slides are drawn from parsed values only. Text is inserted as text, never as markup. External links in the file are never fetched. |
+| Hostile markup reaches the page anyway | A Content Security Policy allows scripts and requests from the site itself only, so injected script cannot run or send data out. |
+| Clickjacking | The app refuses to start inside another site's frame. |
+| Zip bomb | Size limits on the file, the archive and each entry. |
+| The LLM returns hostile or broken text | It is only ever data: XML-escaped, forbidden characters removed. It cannot add shapes, links, macros or files. |
+| File name chosen by LLM output | Reduced to letters, digits, `_` and `-`. |
+| Code injection into the generated Python | Settings are embedded as a JSON string. Nothing from the template is executed. |
+| Supply chain | No runtime dependencies. Locked build tools. CI actions pinned to commit hashes. |
+
+The generated Python uses the standard library only and never calls `eval`, `exec`, `subprocess` or
+the network, so it can be read in full (about 300 lines of engine) before it is approved.
+
+Autosaved templates sit unencrypted in the browser's storage on that device. **Settings → Remove
+everything saved here** deletes them.
+
+This is a self-review, not an independent audit. For internal use, host the built `dist/` folder on an
+internal web server rather than using the public copy.
+
+# 14. Tests
 
 | Layer | File | What it proves |
 |---|---|---|
@@ -361,7 +385,7 @@ checks that its output equals the web app's output exactly.
 | Validity | `tests/py/check_pptx.py` | Every `.pptx` any test wrote: zip integrity, well-formed XML, consistent relationships. In CI also python-pptx and a LibreOffice PDF conversion. |
 | Browser | `tests/e2e/app.spec.ts` | The whole flow in Chromium against the production build: build a template, test it, download the kit, reload, go offline, keyboard, phone width. |
 
-131 tests in total (117 unit and 14 browser). python-pptx and LibreOffice are used in CI only, to check
+136 tests in total (121 unit and 15 browser). python-pptx and LibreOffice are used in CI only, to check
 the output. The product never depends on them.
 
 ```
@@ -372,7 +396,7 @@ npm test             unit, parity, golden and Python tests
 npm run test:e2e     browser tests
 ```
 
-# 14. Build and deploy
+# 15. Build and deploy
 
 `npm run build` type-checks and writes `dist/`. Two small Vite plugins run during the build:
 
@@ -389,7 +413,7 @@ Paths are relative, so the same build works under any URL.
 
 Everything used is free: GitHub Pages, GitHub Actions for public repositories, open-source tools.
 
-# 15. How to extend it
+# 16. How to extend it
 
 **Add an element type.** Add an entry to `BLOCKS` in `src/ooxml/edit.ts`, return its XML from
 `blockXml`, and add a small picture to `BLOCK_ART` in `src/ui/side.ts`. A test inserts every block type
@@ -402,7 +426,7 @@ has no settings, if the test data leaves anything blank, or if the deck is too l
 **Change the fill rules.** Change `src/engine/engine.ts` and `python/engine.py` together and add a
 fixture to the parity test.
 
-# 16. Known limits
+# 17. Known limits
 
 - The preview does not draw charts, SmartArt or effects. They are kept in the file.
 - Text does not shrink to fit. Use word limits so the LLM writes to the space available.

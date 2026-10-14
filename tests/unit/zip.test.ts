@@ -12,6 +12,17 @@ describe("minizip", () => {
     expect(crc32(new Uint8Array())).toBe(0);
   });
 
+  it("refuses an entry that unpacks to more than its listing says (zip bomb)", async () => {
+    const z = new Zip();
+    z.set("big.xml", "slide ".repeat(5000));
+    const out = await z.generate();
+    const dv = new DataView(out.buffer);
+    let p = 0;
+    while (dv.getUint32(p, true) !== 0x02014b50) p++; // the central directory entry
+    dv.setUint32(p + 24, 10, true);                   // claim it unpacks to 10 bytes
+    await expect((await Zip.load(out)).bytes("big.xml")).rejects.toThrow(/far more/);
+  });
+
   it("round-trips stored and deflated entries", async () => {
     const z = new Zip();
     const big = "slide ".repeat(5000);

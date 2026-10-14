@@ -20,7 +20,10 @@ const LN_RE = () => /<a:ln\b(?:[^>]*\/>|.*?<\/a:ln>)/s;
 const INDEX_RE = /^[0-9]+$/;
 const NEWLINE_RE = /\r\n|\n|\r/;
 
-export const xmlEscape = (s: string): string => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// Characters XML 1.0 forbids. One of these in a slide makes PowerPoint refuse the file.
+const ILLEGAL_RE = /[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]/gu;
+const HEX_RE = /^[0-9A-Fa-f]{6}$/;
+export const xmlEscape = (s: string): string => s.replace(ILLEGAL_RE, " ").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 export const xmlUnescape = (s: string): string => s
   .replace(/&#x([0-9a-fA-F]+);/g, (_, h: string) => String.fromCodePoint(parseInt(h, 16)))
   .replace(/&#([0-9]+);/g, (_, d: string) => String.fromCodePoint(parseInt(d, 10)))
@@ -165,7 +168,7 @@ export const visibleText = (xml: string): string => [...xml.matchAll(RUN_RE())].
 function colourCell(cell: string, rules: ColourRule[]): string {
   const text = visibleText(cell).trim().toLowerCase();
   const rule = text ? rules.find(r => String(r.match || "").trim().toLowerCase() === text) : undefined;
-  if (!rule) return cell;
+  if (!rule || !(HEX_RE.test(String(rule.fill)) && HEX_RE.test(String(rule.text)))) return cell;
   const fill = `<a:solidFill><a:srgbClr val="${rule.fill}"/></a:solidFill>`;
   const color = `<a:solidFill><a:srgbClr val="${rule.text}"/></a:solidFill>`;
   if (cell.includes("<a:tcPr")) {

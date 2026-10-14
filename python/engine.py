@@ -28,10 +28,13 @@ FILL_RE = re.compile(r"<a:(solidFill|noFill|gradFill|pattFill|blipFill|grpFill)\
 LN_RE = re.compile(r"<a:ln\b(?:[^>]*/>|.*?</a:ln>)", re.S)
 INDEX_RE = re.compile(r"[0-9]+\Z")
 NEWLINE_RE = re.compile(r"\r\n|\n|\r")
+# Characters XML 1.0 forbids. One of these in a slide makes PowerPoint refuse the file.
+ILLEGAL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
+HEX_RE = re.compile(r"[0-9A-Fa-f]{6}\Z")
 
 
 def xml_escape(s):
-    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return ILLEGAL_RE.sub(" ", s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def xml_unescape(s):
@@ -189,7 +192,7 @@ def visible_text(xml):
 def colour_cell(cell_xml, rules):
     text = visible_text(cell_xml).strip().lower()
     rule = next((r for r in rules if str(r.get("match", "")).strip().lower() == text and text), None)
-    if not rule:
+    if not rule or not (HEX_RE.match(str(rule.get("fill"))) and HEX_RE.match(str(rule.get("text")))):
         return cell_xml
     fill = '<a:solidFill><a:srgbClr val="%s"/></a:solidFill>' % rule["fill"]
     color = '<a:solidFill><a:srgbClr val="%s"/></a:solidFill>' % rule["text"]

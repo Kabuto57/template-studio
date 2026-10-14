@@ -60,3 +60,14 @@ export async function listRecent(): Promise<SavedDoc[]> {
 export async function forgetRecent(id: string): Promise<void> {
   await run("readwrite", s => s.delete(RECENT + id));
 }
+
+/** Remove every template and setting this app has stored in this browser. */
+export async function forgetEverything(): Promise<void> {
+  (await open()).close();
+  dbPromise = null;
+  await new Promise<void>((resolve, reject) => {
+    const req = indexedDB.deleteDatabase(DB);
+    req.onsuccess = req.onblocked = () => resolve();
+    req.onerror = () => reject(req.error ?? new Error("Could not clear storage"));
+  });
+}

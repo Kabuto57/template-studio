@@ -68,6 +68,8 @@ no analytics and no third-party request: every dependency, font included, is bun
 visit the app works offline, and a test in CI fails the build if the page makes a network request after
 loading.
 
+Threats considered, defences and limits are in [SECURITY.md](SECURITY.md).
+
 ## Use it with Dify
 
 1. In Template Studio, open **Get code**.

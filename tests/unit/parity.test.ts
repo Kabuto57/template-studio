@@ -56,6 +56,11 @@ async function cases(): Promise<Case[]> {
       + tableXml({ id: 3, name: "T", box, list: "rows", rows: 4, cols: [{ key: "v", label: "V" }, { key: "w", label: "W" }] })],
   ];
   for (const [name, xml] of edge) out.push({ name, xml: `<p:sld>${xml}</p:sld>`, data, rules: RAG });
+  // 4. hostile input: characters XML forbids, and a colour rule that tries to carry markup
+  const nasty: Data = { a: "nul\u0000 vtab\u000b ff\u000c esc\u001b lone\ud800 pair\ud83d\ude00 tab\t fffe\ufffe", list: ["x\u0001", "y"], rows: [{ v: "High" }] };
+  const badRules: ColourRule[] = [{ match: "High", fill: 'FF0000"/><a:evil/><a:srgbClr val="', text: "zzzzzz" }];
+  out.push({ name: "forbidden characters", xml: `<p:sld>${para(run("{{a}}"))}${para(run("{{list}}"))}</p:sld>`, data: nasty, rules: RAG });
+  out.push({ name: "hostile colour rule", xml: `<p:sld>${tbl(row(cell(para(run("{{rows.1.v}}")))))}</p:sld>`, data: nasty, rules: badRules });
   return out;
 }
 
@@ -71,6 +76,16 @@ describe("engine parity (TypeScript vs Python)", async () => {
     expect(xml).toBe(fromPython[i]!.xml);
     expect([...report.replaced].sort()).toEqual(fromPython[i]!.replaced);
     expect([...report.missing].sort()).toEqual(fromPython[i]!.missing);
+  });
+
+  it("never lets forbidden characters or rule markup into a slide", () => {
+    for (const name of ["forbidden characters", "hostile colour rule"]) {
+      const c = all.find(x => x.name === name)!;
+      const xml = fillXml(c.xml, c.data, newReport(), c.rules);
+      expect(xml).not.toMatch(/[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]|a:evil/);
+      expect(xml).not.toMatch(/[\ud800-\udfff]/u); // no lone surrogates
+      if (name === "forbidden characters") expect(xml).toContain("pair\ud83d\ude00"); // real emoji survive
+    }
   });
 
   it("actually changes the fixtures (the comparison is not vacuous)", () => {

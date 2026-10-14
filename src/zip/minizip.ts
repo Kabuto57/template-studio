@@ -17,11 +17,28 @@ export function crc32(u8: Uint8Array): number {
   return (c ^ 0xFFFFFFFF) >>> 0;
 }
 
-async function pipe(u8: Uint8Array, stream: TransformStream<Uint8Array, Uint8Array>): Promise<Uint8Array> {
+/** The most a single archive may unpack to. A real template is a few MB; this stops a zip bomb. */
+export const MAX_UNPACKED = 400 * 1024 * 1024;
+
+/** Runs bytes through a (de)compression stream, giving up as soon as the output passes `limit`. */
+async function pipe(u8: Uint8Array, stream: TransformStream<Uint8Array, Uint8Array>, limit = Infinity): Promise<Uint8Array> {
   const source = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(u8); c.close(); } });
-  return new Uint8Array(await new Response(source.pipeThrough(stream)).arrayBuffer());
+  const reader = source.pipeThrough(stream).getReader();
+  const parts: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > limit) { void reader.cancel(); throw new Error("This file unpacks to far more than its listing says. It was not opened."); }
+    parts.push(value);
+  }
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const p of parts) { out.set(p, at); at += p.length; }
+  return out;
 }
-const inflate = (u8: Uint8Array) => pipe(u8, new DecompressionStream("deflate-raw") as TransformStream<Uint8Array, Uint8Array>);
+const inflate = (u8: Uint8Array, size: number) => pipe(u8, new DecompressionStream("deflate-raw") as TransformStream<Uint8Array, Uint8Array>, size);
 const deflate = (u8: Uint8Array) => pipe(u8, new CompressionStream("deflate-raw") as TransformStream<Uint8Array, Uint8Array>);
 const enc = new TextEncoder();
 const dec = new TextDecoder("utf-8");
@@ -46,6 +63,7 @@ export class Zip {
     const count = dv.getUint16(eocd + 10, true);
     let p = dv.getUint32(eocd + 16, true);
     const z = new Zip();
+    let total = 0;
     for (let i = 0; i < count; i++) {
       if (p + 46 > u8.length || dv.getUint32(p, true) !== 0x02014b50) throw new Error("The file's zip directory is damaged.");
       const method = dv.getUint16(p + 10, true), crc = dv.getUint32(p + 16, true);
@@ -56,6 +74,7 @@ export class Zip {
       const start = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
       z.entries.set(name, { raw: { method, crc, size, comp: u8.slice(start, start + compSize) } });
       p += 46 + nLen + xLen + cLen;
+      if ((total += size) > MAX_UNPACKED) throw new Error("This file is too large to open (over 400 MB unpacked).");
     }
     return z;
   }
@@ -70,7 +89,7 @@ export class Zip {
     if (!e.data) {
       const r = e.raw!;
       if (r.method === 0) e.data = r.comp;
-      else if (r.method === 8) e.data = await inflate(r.comp);
+      else if (r.method === 8) e.data = await inflate(r.comp, r.size);
       else throw new Error(`Unsupported compression in ${name}`);
     }
     return e.data;

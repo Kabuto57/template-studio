@@ -72,7 +72,7 @@ function buildTestPanel(host: HTMLElement): void {
       else if (j && typeof j === "object") {
         const o = j as Record<string, unknown>;
         if (typeof o.pptx_base64 === "string") b64 = o.pptx_base64;
-        if (typeof o.file_name === "string" && o.file_name) name = o.file_name;
+        if (typeof o.file_name === "string" && o.file_name) name = `${safeName(o.file_name.replace(/\.pptx$/i, ""))}.pptx`;
       }
     } catch { /* not JSON: treat it as the base64 text itself */ }
     b64 = b64.replace(/[^A-Za-z0-9+/=]/g, "");

@@ -14,7 +14,7 @@ import { buildDeck } from "../templates/builder";
 import { DESIGNS } from "../templates/designs";
 import { $, ICON, el, toast } from "./dom";
 import { fieldsPanel } from "./fields";
-import { openBlank, openDesign, openSample, openSaved } from "./project";
+import { openBlank, openDesign, openSample, openSaved, wipeAll } from "./project";
 import { doInsertBlock, makeDraggable } from "./stage";
 import { S, ui } from "./state";
 
@@ -179,6 +179,18 @@ function settingsPanel(): HTMLElement {
     <li>In Test, paste the JSON your LLM returned and check the slides.</li>
     <li>In Get code, copy the prompt, schema and Python into Dify.</li></ol>`;
   wrap.appendChild(how);
+
+  const data = el("div", { class: "sect" });
+  data.appendChild(el("div", { class: "sect-title" }, "Saved on this device"));
+  data.appendChild(el("span", { class: "hint" }, "Your open template and recent ones are kept in this browser so you can come back to them. On a shared computer, remove them when you finish."));
+  const wipe = el("button", { class: "btn small", type: "button", id: "wipeBtn" }, "Remove everything saved here");
+  let armed = false;
+  wipe.addEventListener("click", () => {
+    if (!armed) { armed = true; wipe.textContent = "Click again to remove"; wipe.classList.add("danger"); return; }
+    void wipeAll();
+  });
+  data.appendChild(wipe);
+  wrap.appendChild(data);
   return wrap;
 }
 

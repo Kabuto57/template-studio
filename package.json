@@ -1,6 +1,6 @@
 {
   "name": "template-studio",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "Turn a PowerPoint template into the prompt, JSON schema and Python code an LLM needs to fill it. Runs entirely in the browser.",
