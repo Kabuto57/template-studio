@@ -3,7 +3,7 @@
 import { fillXml, isSlidePart, newReport, parseContent, type Data, type Report } from "../engine/engine";
 import { BLOCKS, addBlankSlide, blockDef, blockSize, deleteSlide, duplicateSlide, inches, insertBlock, moveSlide, placeField, readBox, resizeBox, setBox, snap, type BlockType, type FieldPayload, type Rect } from "../ooxml/edit";
 import { collectObjects, fitPlaceholderBoxes, renderSlide } from "../ooxml/render";
-import { parseXml } from "../ooxml/xml";
+import { esc, parseXml } from "../ooxml/xml";
 import { $, ICON, el, toast } from "./dom";
 import { S, clearSel, ui } from "./state";
 
@@ -51,9 +51,10 @@ export function renderStage(): void {
   if (editable) drawOverlay();
   renderFilm(filled);
   $("#stageMeta").textContent = `Slide ${S.cur + 1} of ${deck.slides.length}`;
-  $("#stageHint").textContent = note || (editable
-    ? "Drag elements and fields onto the slide. Arrow keys nudge, Delete removes."
-    : "Your template filled with the test data.");
+  $("#stageHint").innerHTML = note ? esc(note) : editable
+    ? "<b>Step 1 of 3.</b> Pick a design, then click a yellow field to tell the LLM what to write there."
+    : "<b>Step 2 of 3.</b> This is your template filled with sample data. Paste real LLM output on the right to check it.";
+  $("#nextBtn").textContent = editable ? "Next: Test" : "Next: Get code";
 }
 
 function renderFilm(filled: Record<string, string> | null): void {

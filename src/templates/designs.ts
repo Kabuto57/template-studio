@@ -2,6 +2,7 @@
 // layout, with fields already placed and described so it produces a usable kit straight away.
 // Fonts are limited to ones PowerPoint has on both Windows and macOS.
 import type { CellStyle } from "../ooxml/edit";
+import { BRIEFS } from "./briefs";
 import { shape, table, text, type Design } from "./builder";
 
 const RAG = [
@@ -382,4 +383,6 @@ const orchard = ((): Design => {
   };
 })();
 
-export const DESIGNS: Design[] = [boardroom, signal, headline, postmortem, orchard];
+export const MORE: Design[] = [boardroom, signal, headline, postmortem, orchard];
+export const DESIGNS: Design[] = [...BRIEFS, ...MORE];
+export { BRIEFS };

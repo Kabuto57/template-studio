@@ -41,8 +41,8 @@ test("first visit opens the audit sample, ready to demo", async ({ page }) => {
   await expect(page.locator(".steps [data-view=design]")).toHaveAttribute("aria-selected", "true");
   expect(await slideCount(page)).toBe(2);
   expect(await fieldKeys(page)).toContain("{{report_title}}");
-  await expect(page.locator(".gallery .card")).toHaveCount(7);
-  await expect(page.locator(".gallery .card .slide")).toHaveCount(6); // live cover renders
+  await expect(page.locator(".gallery .card")).toHaveCount(11);
+  await expect(page.locator(".gallery .card .slide")).toHaveCount(10); // live cover renders
   expect(errors).toEqual([]);
 });
 
@@ -218,7 +218,7 @@ test("rename a field and it changes in the template and the outputs", async ({ p
   await expect(page.locator("#promptOut")).toContainText('"company": "Company or business unit audited"');
 });
 
-for (const id of ["boardroom", "signal", "headline", "postmortem", "orchard"]) {
+for (const id of ["brief", "market", "client", "approval", "boardroom", "signal", "headline", "postmortem", "orchard"]) {
   test(`gallery design "${id}" opens, fills completely and exports a sound kit`, async ({ page }) => {
     const errors = watchErrors(page);
     await open(page);

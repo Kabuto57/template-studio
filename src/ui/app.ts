@@ -97,6 +97,7 @@ function wire(): void {
   $("#undoBtn").addEventListener("click", () => undoRedo("undo"));
   $("#redoBtn").addEventListener("click", () => undoRedo("redo"));
   $("#aboutBtn").addEventListener("click", openAbout);
+  $("#nextBtn").addEventListener("click", () => setView(S.view === "design" ? "test" : "code"));
   $("#kitBtn").addEventListener("click", () => void downloadKit());
   $("#openBtn").addEventListener("click", () => $("#fileInput").click());
   $("#aboutDialog").addEventListener("click", e => { if (e.target === e.currentTarget) (e.currentTarget as HTMLDialogElement).close(); });

@@ -10,8 +10,8 @@ import { BLOCKS, type BlockType } from "../ooxml/edit";
 import { renderSlide } from "../ooxml/render";
 import { esc } from "../ooxml/xml";
 import { forgetRecent, listRecent } from "../persist/db";
-import { buildDeck } from "../templates/builder";
-import { DESIGNS } from "../templates/designs";
+import { buildDeck, type Design } from "../templates/builder";
+import { BRIEFS, MORE } from "../templates/designs";
 import { $, ICON, el, toast } from "./dom";
 import { fieldsPanel } from "./fields";
 import { openBlank, openDesign, openSample, openSaved, wipeAll } from "./project";
@@ -48,13 +48,21 @@ function designCard(id: string, name: string, blurb: string, palette: string[], 
 
 function designsPanel(): HTMLElement {
   const wrap = el("div");
-  wrap.appendChild(el("div", { class: "panel-head" }, "<h2>Designs</h2><p>Start from a finished deck. Fields are already placed and described.</p>"));
+  wrap.appendChild(el("div", { class: "panel-head" }, "<h2>Designs</h2><p>Pick a design to start. Yellow boxes are fields the LLM fills; everything else stays as you set it.</p>"));
+  const card = (d: Design) => designCard(d.id, d.name, d.blurb, d.palette, () => buildDeck(d.slides), d.test as Data, d.project.settings.colour_rules, () => openDesign(d));
+  const briefs = el("div", { class: "sect" });
+  briefs.appendChild(el("div", { class: "sect-title" }, "Bank briefs"));
+  const bgrid = el("div", { class: "gallery" });
+  for (const d of BRIEFS) bgrid.appendChild(card(d));
+  briefs.appendChild(bgrid);
+  wrap.appendChild(briefs);
   const sect = el("div", { class: "sect" });
+  sect.appendChild(el("div", { class: "sect-title" }, "More designs"));
   const grid = el("div", { class: "gallery" });
   grid.appendChild(designCard("audit", "Audit report", "Internal audit highlights", ["16253D", "2A7F8F", "EEF2F5"],
     async () => new Uint8Array(await (await fetch(sampleUrl)).arrayBuffer()),
     sampleTest as Data, (sampleProject as Partial<Project>).settings?.colour_rules ?? [], openSample));
-  for (const d of DESIGNS) grid.appendChild(designCard(d.id, d.name, d.blurb, d.palette, () => buildDeck(d.slides), d.test as Data, d.project.settings.colour_rules, () => openDesign(d)));
+  for (const d of MORE) grid.appendChild(card(d));
   const blank = el("button", { class: "card blank", type: "button", "aria-current": String(S.designId === "blank") },
     `<div class="thumb-box">${ICON.plus}</div><span class="name">Blank</span><span class="blurb">An empty 16:9 slide</span>`);
   blank.addEventListener("click", () => { void openBlank().then(() => { ui.setView("design"); ui.setSide("elements"); toast("Blank slide ready. Add elements from the left."); }); });
