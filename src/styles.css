@@ -208,6 +208,17 @@ button.fgroup-h:hover { color: var(--primary); }
 
 /* ------------------------------------------------------------------ stage */
 .stage { grid-area: stage; min-width: 0; min-height: 0; display: flex; flex-direction: column; outline: none; }
+.insert-bar { display: flex; gap: 4px; padding: 8px 24px; background: var(--panel); border-bottom: 1px solid var(--line); flex: none; overflow-x: auto; }
+.app:not([data-view="design"]) .insert-bar { display: none; }
+.ins-group { display: flex; flex-direction: column; flex: none; padding: 0 10px; border-right: 1px solid var(--line); }
+.ins-group:first-child { padding-left: 0; }
+.ins-group:last-child { border-right: 0; }
+.ins-row { display: flex; gap: 2px; }
+.ins-name { text-align: center; color: var(--muted); font-size: 11px; padding-top: 2px; }
+.ins-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 64px; padding: 6px 6px 4px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: inherit; font-size: var(--fs-xs); cursor: pointer; }
+.ins-btn svg { width: 44px; height: 23px; }
+.ins-btn:hover { background: var(--work); }
+.ins-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .stage-bar { display: flex; align-items: center; gap: 12px; padding: 12px 24px 0; color: var(--muted); font-size: var(--fs-sm); flex: none; min-height: 32px; }
 .stage-bar b { color: var(--ink); font-weight: 600; }
 .stage-bar span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

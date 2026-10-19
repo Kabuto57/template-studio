@@ -6,7 +6,7 @@ import { $, $$, ICON, el, toast } from "./dom";
 import { deleteSelected, duplicateSelected, renderInspector } from "./inspector";
 import { renderCodePage, renderTestPanel } from "./outputs";
 import { downloadKit, exampleText, openFile, restoreOrSample, save } from "./project";
-import { renderSide } from "./side";
+import { renderInsertBar, renderSide } from "./side";
 import { drawOverlay, renderStage, wireStage } from "./stage";
 import { S, clearSel, ui, type SideTab, type View } from "./state";
 
@@ -139,10 +139,15 @@ export async function boot(): Promise<void> {
     settingsChanged: () => { if (!S.testEdited) S.testText = exampleText(); save(); },
   });
   wire();
+  renderInsertBar();
   let v: string | null = "design";
   try { v = localStorage.getItem("template-studio:view"); } catch { /* storage blocked */ }
   S.view = v === "test" || v === "code" ? v : "design";
   await restoreOrSample();
   setView(S.view);
-  if ("serviceWorker" in navigator && import.meta.env.PROD) void navigator.serviceWorker.register("./sw.js").catch(() => { /* offline support is optional */ });
+  if ("serviceWorker" in navigator && import.meta.env.PROD) {
+    // a new version took over from an old one: reload so the page shows it, not the cached copy
+    if (navigator.serviceWorker.controller) navigator.serviceWorker.addEventListener("controllerchange", () => location.reload(), { once: true });
+    void navigator.serviceWorker.register("./sw.js").catch(() => { /* offline support is optional */ });
+  }
 }

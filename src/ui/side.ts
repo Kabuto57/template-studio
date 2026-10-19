@@ -133,6 +133,26 @@ function elementsPanel(): HTMLElement {
   return wrap;
 }
 
+/** The ribbon above the slide, PowerPoint style: the same blocks as the Elements panel, grouped. */
+const GROUPS: [string, BlockType[]][] = [["Text", ["title", "text", "bullets", "label"]], ["Data", ["number", "table"]], ["Shapes", ["box", "circle", "line"]]];
+export function renderInsertBar(): void {
+  const bar = $("#insertBar");
+  for (const [name, types] of GROUPS) {
+    const g = el("div", { class: "ins-group", role: "group", "aria-label": name });
+    const row = el("div", { class: "ins-row" });
+    for (const t of types) {
+      const b = BLOCKS.find(x => x.type === t)!;
+      const btn = el("button", { class: "ins-btn", type: "button", title: `${b.label}: ${b.hint}` },
+        `<svg viewBox="0 0 120 62" aria-hidden="true">${BLOCK_ART[t]}</svg><span>${b.label}</span>`);
+      makeDraggable(btn, { kind: "block", type: t });
+      btn.addEventListener("click", () => doInsertBlock(t));
+      row.appendChild(btn);
+    }
+    g.append(row, el("span", { class: "ins-name" }, name));
+    bar.appendChild(g);
+  }
+}
+
 /* ---------------------------------------------------------------- settings */
 function settingsPanel(): HTMLElement {
   const wrap = el("div");
