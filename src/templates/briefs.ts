@@ -3,7 +3,7 @@
 import type { CellStyle } from "../ooxml/edit";
 import { shape, table, text, type Design } from "./builder";
 
-const RED = "D7182A", INK = "1D1D1F", GREY = "6B6B70", MIST = "F4F4F5", RULE = "E4E4E7", SANS = "Arial";
+const RED = "E31B23", INK = "111111", GREY = "666666", MIST = "F4F4F5", RULE = "E4E4E7", SANS = "Arial";
 const RAG = [
   { match: "High", fill: "FADBD8", text: "A93226" },
   { match: "Medium", fill: "FCEBCF", text: "9C640C" },
@@ -26,7 +26,7 @@ const fact = (x: number, y: number, w: number, field: string, name: string) => t
 
 /* ------------------------------------------------------------------ Brief */
 const brief: Design = {
-  id: "brief", name: "Brief", blurb: "One-idea executive brief", palette: [RED, INK, MIST],
+  id: "brief", name: "Brief", blurb: "One-idea executive brief", palette: [RED, INK, "FFFFFF"],
   slides: [
     { bg: "FFFFFF", els: [
       shape(0, 0, 0.35, 7.5, RED),
@@ -86,14 +86,15 @@ const brief: Design = {
 
 /* ------------------------------------------------------------------ Market update */
 const market: Design = {
-  id: "market", name: "Market update", blurb: "Weekly markets and economics", palette: [INK, RED, MIST],
+  id: "market", name: "Market update", blurb: "Weekly markets and economics", palette: [RED, INK, "FFFFFF"],
   slides: [
-    { bg: INK, els: [
-      shape(0.9, 1.2, 0.5, 0.07, RED),
-      label(0.9, 1.45, 8, "MARKET UPDATE", "FFFFFF"),
-      text(0.9, 2.1, 10.5, 2.6, "{{update_title}}", { sz: 44, b: true, color: "FFFFFF", font: SANS }, { anchor: "b" }),
-      text(0.9, 4.95, 10, 0.5, "As of {{as_of}}", { sz: 18, color: "B4B4BA", font: SANS }),
-      text(0.9, 6.5, 10, 0.4, "{{desk}}", { sz: 12, color: "8E8E95", font: SANS }),
+    { bg: "FFFFFF", els: [
+      shape(0, 6.9, 13.333, 0.6, RED),
+      label(0.9, 1.2, 8, "MARKET UPDATE"),
+      text(0.9, 1.8, 10.5, 2.6, "{{update_title}}", { sz: 44, b: true, color: INK, font: SANS }, { anchor: "b" }),
+      shape(0.9, 4.65, 1.2, 0.04, INK),
+      text(0.9, 4.9, 10, 0.5, "As of {{as_of}}", { sz: 18, color: GREY, font: SANS }),
+      text(0.9, 6.3, 10, 0.4, "{{desk}}", { sz: 12, color: GREY, font: SANS }),
     ] },
     { bg: "FFFFFF", els: [
       ...frame("Markets at a glance", "Market update  |  For internal discussion only"),
@@ -154,7 +155,7 @@ const market: Design = {
 
 /* ------------------------------------------------------------------ Client brief */
 const client: Design = {
-  id: "client", name: "Client brief", blurb: "Meeting prep for relationship managers", palette: [RED, INK, MIST],
+  id: "client", name: "Client brief", blurb: "Meeting prep for relationship managers", palette: [RED, INK, "FFFFFF"],
   slides: [
     { bg: "FFFFFF", els: [
       shape(0, 0, 13.333, 0.14, RED),
@@ -220,14 +221,14 @@ const client: Design = {
 
 /* ------------------------------------------------------------------ Approval paper */
 const approval: Design = {
-  id: "approval", name: "Approval paper", blurb: "Papers for committee approval", palette: [INK, RED, MIST],
+  id: "approval", name: "Approval paper", blurb: "Papers for committee approval", palette: [RED, INK, "FFFFFF"],
   slides: [
     { bg: "FFFFFF", els: [
-      shape(0, 0, 5.6, 7.5, INK),
-      shape(0.9, 1.2, 0.5, 0.07, RED),
-      label(0.9, 1.45, 4.3, "PAPER FOR APPROVAL", "FFFFFF"),
-      text(0.9, 2.1, 4.2, 3.6, "{{paper_title}}", { sz: 36, b: true, color: "FFFFFF", font: SANS }, { anchor: "b" }),
-      text(0.9, 6.3, 4.3, 0.5, "{{paper_date}}", { sz: 14, color: "B4B4BA", font: SANS }),
+      shape(0, 0, 0.35, 7.5, RED),
+      shape(5.7, 1.2, 0.01, 5.3, RULE),
+      label(0.9, 1.2, 4.3, "PAPER FOR APPROVAL"),
+      text(0.9, 1.8, 4.4, 3.9, "{{paper_title}}", { sz: 36, b: true, color: INK, font: SANS }, { anchor: "b" }),
+      text(0.9, 6.1, 4.3, 0.5, "{{paper_date}}", { sz: 14, color: GREY, font: SANS }),
       label(6.4, 1.2, 6, "DECISION REQUIRED"),
       text(6.4, 1.7, 6, 2.2, "{{decision_required}}", { sz: 22, b: true, color: INK, font: SANS, line: 1.1 }),
       shape(6.4, 4.3, 6.03, 0.01, RULE),
@@ -287,4 +288,191 @@ const approval: Design = {
   },
 };
 
-export const BRIEFS: Design[] = [brief, market, client, approval];
+/* ------------------------------------------------------------------ Project update */
+const project: Design = {
+  id: "project", name: "Project update", blurb: "Fortnightly project status", palette: [RED, INK, "FFFFFF"],
+  slides: [
+    { bg: "FFFFFF", els: [
+      shape(0, 0, 13.333, 0.14, RED),
+      label(0.9, 1.2, 8, "PROJECT UPDATE"),
+      text(0.9, 1.8, 7.4, 2.4, "{{project_name}}", { sz: 44, b: true, color: INK, font: SANS }, { anchor: "b" }),
+      text(0.9, 4.4, 7.4, 0.5, "{{reporting_period}}", { sz: 18, color: GREY, font: SANS }),
+      text(8.9, 1.8, 3.53, 2.4, [{ text: "Overall status", sz: 13, color: "FFFFFF", font: SANS, after: 6 }, { text: "{{overall_status}}", sz: 32, b: true, color: "FFFFFF", font: SANS }],
+        {}, { fill: INK, anchor: "ctr", ins: 0.3 }),
+      text(0.9, 6.5, 10, 0.4, "Project lead: {{project_lead}}", { sz: 12, color: GREY, font: SANS }),
+    ] },
+    { bg: "FFFFFF", els: [
+      ...frame("Where we are", "Project update  |  Internal"),
+      fact(0.9, 1.8, 3.6, "percent_complete", "Complete"), fact(4.87, 1.8, 3.6, "budget_used", "Budget used"), fact(8.83, 1.8, 3.6, "go_live", "Go-live"),
+      label(0.9, 3.75, 5, "SUMMARY", INK),
+      text(0.9, 4.2, 5.6, 2.5, "{{summary}}", { sz: 17, color: INK, font: SANS, line: 1.15 }),
+      label(7, 3.75, 5, "DONE THIS PERIOD", INK),
+      text(7, 4.2, 5.43, 2.5, "{{done}}", { sz: 15, color: INK, font: SANS, bullet: true, after: 8 }),
+    ] },
+    { bg: "FFFFFF", els: [
+      ...frame("Workstreams and issues", "Project update  |  Internal"),
+      table(0.9, 1.8, 7.4, "workstreams", { rows: 5, head, body, band: "FAFAFA", rowH: 0.8, headH: 0.5,
+        cols: [{ key: "name", label: "Workstream", w: 2.4 }, { key: "status", label: "Status", w: 1.3 }, { key: "note", label: "Note", w: 3.7 }] }),
+      text(8.8, 1.8, 3.63, 4.8, [{ text: "Help needed", sz: 13, b: true, color: "FFFFFF", font: SANS, after: 8 }, { text: "{{help_needed}}", sz: 17, color: "FFFFFF", font: SANS, line: 1.1 }],
+        {}, { fill: RED, ins: 0.3 }),
+    ] },
+  ],
+  project: {
+    settings: {
+      file_name_field: "project_name",
+      colour_rules: [{ match: "On track", fill: "D9F2E3", text: "1E7A46" }, { match: "At risk", fill: "FCEBCF", text: "9C640C" }, { match: "Off track", fill: "FADBD8", text: "A93226" }],
+    },
+    fields: {
+      project_name: { desc: "Project name", max: 6, example: "Payments platform migration" },
+      reporting_period: { desc: "Dates this update covers", example: "6 to 17 October 2026" },
+      overall_status: { desc: "Overall status", allowed: "On track, At risk, Off track", example: "At risk" },
+      project_lead: { desc: "Project lead's name", example: "Ravi Kumar" },
+      percent_complete: { desc: "Overall completion", max: 2, example: "62%" },
+      budget_used: { desc: "Share of budget spent", max: 2, example: "58%" },
+      go_live: { desc: "Planned go-live date", max: 3, example: "9 March 2027" },
+      summary: { desc: "Overall position in plain words", max: 45, example: "Core build is on schedule. Testing with the card scheme slipped two weeks because their test environment was down, which puts the March go-live at risk unless we add a second test team." },
+      done: { type: "list", desc: "What was finished this period", max: 10, example: "Settlement module passed internal testing\nData mapping signed off by Finance\nCut-over plan drafted" },
+      "workstreams[]": { desc: "in delivery order" },
+      "workstreams[].name": { desc: "Workstream", max: 3, example: "Core build\nScheme testing\nData migration\nTraining" },
+      "workstreams[].status": { desc: "Status", allowed: "On track, At risk, Off track", example: "On track\nAt risk\nOn track\nOn track" },
+      "workstreams[].note": { desc: "One-line note", max: 10, example: "Settlement module complete\nTwo weeks behind, scheme environment down\nDry run booked for November\nMaterials drafted" },
+      help_needed: { desc: "Decisions or support needed from leadership", max: 40, example: "Approve a second test team for six weeks at about $90k, so scheme testing can catch up and the March go-live holds." },
+    },
+  },
+  test: {
+    project_name: "Payments platform migration", reporting_period: "6 to 17 October 2026", overall_status: "At risk", project_lead: "Ravi Kumar",
+    percent_complete: "62%", budget_used: "58%", go_live: "9 March 2027",
+    summary: "Core build is on schedule. Testing with the card scheme slipped two weeks because their test environment was down, which puts the March go-live at risk unless we add a second test team.",
+    done: ["Settlement module passed internal testing", "Data mapping signed off by Finance", "Cut-over plan drafted"],
+    workstreams: [
+      { name: "Core build", status: "On track", note: "Settlement module complete" },
+      { name: "Scheme testing", status: "At risk", note: "Two weeks behind, scheme environment down" },
+      { name: "Data migration", status: "On track", note: "Dry run booked for November" },
+      { name: "Training", status: "On track", note: "Materials drafted" },
+    ],
+    help_needed: "Approve a second test team for six weeks at about $90k, so scheme testing can catch up and the March go-live holds.",
+  },
+};
+
+/* ------------------------------------------------------------------ Quarterly review */
+const quarterly: Design = {
+  id: "quarterly", name: "Quarterly review", blurb: "Team results for the quarter", palette: [RED, INK, "FFFFFF"],
+  slides: [
+    { bg: "FFFFFF", els: [
+      shape(0, 0, 0.35, 7.5, RED),
+      text(1.2, 1.2, 8, 0.6, "{{quarter}}", { sz: 22, b: true, color: RED, font: SANS }),
+      text(1.2, 1.8, 10, 2.6, "{{review_title}}", { sz: 44, b: true, color: INK, font: SANS }, { anchor: "b" }),
+      shape(1.2, 4.65, 1.2, 0.04, INK),
+      text(1.2, 4.9, 10, 0.5, "{{team}}", { sz: 18, color: GREY, font: SANS }),
+    ] },
+    { bg: "FFFFFF", els: [
+      ...frame("The quarter in numbers", "Quarterly review  |  Internal"),
+      text(0.9, 1.9, 3.6, 1.3, "{{metric_1}}", { sz: 54, b: true, color: RED, font: SANS }, { anchor: "b" }),
+      text(0.9, 3.25, 3.6, 0.5, "{{metric_1_label}}", { sz: 15, color: GREY, font: SANS }),
+      text(4.87, 1.9, 3.6, 1.3, "{{metric_2}}", { sz: 54, b: true, color: INK, font: SANS }, { anchor: "b" }),
+      text(4.87, 3.25, 3.6, 0.5, "{{metric_2_label}}", { sz: 15, color: GREY, font: SANS }),
+      text(8.83, 1.9, 3.6, 1.3, "{{metric_3}}", { sz: 54, b: true, color: INK, font: SANS }, { anchor: "b" }),
+      text(8.83, 3.25, 3.6, 0.5, "{{metric_3_label}}", { sz: 15, color: GREY, font: SANS }),
+      shape(0.9, 4.3, 11.53, 0.01, RULE),
+      label(0.9, 4.6, 5, "THE TAKEAWAY"),
+      text(0.9, 5.05, 11.5, 1.6, "{{takeaway}}", { sz: 22, b: true, color: INK, font: SANS, line: 1.1 }),
+    ] },
+    { bg: "FFFFFF", els: [
+      ...frame("Wins, misses and next quarter", "Quarterly review  |  Internal"),
+      label(0.9, 1.8, 3.6, "WINS", INK),
+      text(0.9, 2.35, 3.6, 4.3, "{{wins}}", { sz: 15, color: INK, font: SANS, bullet: true, after: 10 }),
+      label(4.87, 1.8, 3.6, "MISSES", INK),
+      text(4.87, 2.35, 3.6, 4.3, "{{misses}}", { sz: 15, color: INK, font: SANS, bullet: true, after: 10 }),
+      text(8.83, 1.8, 3.6, 4.85, [{ text: "Next quarter", sz: 13, b: true, color: "FFFFFF", font: SANS, after: 8 }, { text: "{{priorities}}", sz: 15, color: "FFFFFF", font: SANS, bullet: true, after: 10 }],
+        {}, { fill: RED, ins: 0.3 }),
+    ] },
+  ],
+  project: {
+    settings: { file_name_field: "review_title", colour_rules: [] },
+    fields: {
+      quarter: { desc: "Quarter and year", example: "Q3 2026" },
+      review_title: { desc: "Title of the review", max: 8, example: "Digital channels quarterly review" },
+      team: { desc: "Team and presenter", example: "Digital Channels, presented by Sarah Chua" },
+      metric_1: { desc: "Most important number, short form", max: 2, example: "1.2m" },
+      metric_1_label: { desc: "What the first number measures", max: 5, example: "Monthly active app users" },
+      metric_2: { desc: "Second number, short form", max: 2, example: "+18%" },
+      metric_2_label: { desc: "What the second number measures", max: 5, example: "Digital sales on last quarter" },
+      metric_3: { desc: "Third number, short form", max: 2, example: "4.7" },
+      metric_3_label: { desc: "What the third number measures", max: 5, example: "App store rating" },
+      takeaway: { desc: "The one sentence the audience should remember", max: 28, example: "Digital sales grew 18%, but most of the growth came from existing customers, so new-customer acquisition is next quarter's focus." },
+      wins: { type: "list", desc: "What went well", max: 10, example: "Card activation in app cut to two minutes\nApp rating up from 4.4 to 4.7\nChatbot resolved 61% of queries" },
+      misses: { type: "list", desc: "What fell short", max: 10, example: "New-to-bank sign-ups 12% below target\nWealth onboarding launch slipped to Q4" },
+      priorities: { type: "list", desc: "Priorities for next quarter", max: 10, example: "Launch wealth onboarding in app\nReferral campaign for new customers\nCut login failures by half" },
+    },
+  },
+  test: {
+    quarter: "Q3 2026", review_title: "Digital channels quarterly review", team: "Digital Channels, presented by Sarah Chua",
+    metric_1: "1.2m", metric_1_label: "Monthly active app users", metric_2: "+18%", metric_2_label: "Digital sales on last quarter",
+    metric_3: "4.7", metric_3_label: "App store rating",
+    takeaway: "Digital sales grew 18%, but most of the growth came from existing customers, so new-customer acquisition is next quarter's focus.",
+    wins: ["Card activation in app cut to two minutes", "App rating up from 4.4 to 4.7", "Chatbot resolved 61% of queries"],
+    misses: ["New-to-bank sign-ups 12% below target", "Wealth onboarding launch slipped to Q4"],
+    priorities: ["Launch wealth onboarding in app", "Referral campaign for new customers", "Cut login failures by half"],
+  },
+};
+
+/* ------------------------------------------------------------------ Report */
+/** A heading over a paragraph: the building block of the two-column report. */
+const para = (x: number, y: number, h: number, title: string, field: string) => [
+  label(x, y, 5.5, title, INK),
+  text(x, y + 0.45, 5.5, h, `{{${field}}}`, { sz: 15, color: INK, font: SANS, line: 1.15 }),
+];
+const report: Design = {
+  id: "report", name: "Report", blurb: "Two-column write-up with one table", palette: [RED, INK, "FFFFFF"],
+  slides: [
+    { bg: "FFFFFF", els: [
+      shape(0, 0, 0.35, 7.5, RED),
+      label(1.2, 1.2, 8, "REPORT"),
+      text(1.2, 1.8, 10, 2.6, "{{report_title}}", { sz: 44, b: true, color: INK, font: SANS }, { anchor: "b" }),
+      shape(1.2, 4.65, 1.2, 0.04, INK),
+      text(1.2, 4.9, 10, 0.5, "{{team}}  |  {{report_date}}", { sz: 18, color: GREY, font: SANS }),
+    ] },
+    { bg: "FFFFFF", els: [
+      ...frame("Summary", "Report  |  Internal"),
+      ...para(0.9, 1.8, 1.9, "BACKGROUND", "background"), ...para(6.93, 1.8, 1.9, "SCOPE", "scope"),
+      ...para(0.9, 4.3, 2, "WHAT WE FOUND", "findings_summary"), ...para(6.93, 4.3, 2, "WHAT IT MEANS", "conclusion"),
+    ] },
+    { bg: "FFFFFF", els: [
+      ...frame("Points and actions", "Report  |  Internal"),
+      table(0.9, 1.8, 11.53, "points", { rows: 5, head, body, band: "FAFAFA", rowH: 0.85, headH: 0.5,
+        cols: [{ key: "point", label: "Point", w: 4.2 }, { key: "rating", label: "Rating", w: 1.2 }, { key: "action", label: "Action", w: 4.3 }, { key: "owner", label: "Owner", w: 1.8 }] }),
+    ] },
+  ],
+  project: {
+    settings: { file_name_field: "report_title", colour_rules: RAG },
+    fields: {
+      report_title: { desc: "Title of the report", max: 10, example: "Review of vendor onboarding" },
+      team: { desc: "Team that wrote the report", example: "Group Operations" },
+      report_date: { desc: "Date of the report", example: "19 October 2026" },
+      background: { desc: "Why this was looked at", max: 45, example: "Vendor onboarding moved to a new system in March. Business units have reported delays, and two vendors were paid before their checks were complete." },
+      scope: { desc: "What was covered and over what period", max: 45, example: "All 214 vendors onboarded between March and August 2026, across Singapore and Hong Kong. Contract terms and pricing were not reviewed." },
+      findings_summary: { desc: "The main findings in plain words", max: 50, example: "Onboarding takes 23 days on average against a target of 10. Checks are done, but evidence is kept in emails, and the system lets payments start before approval is recorded." },
+      conclusion: { desc: "What the findings mean and the overall view", max: 50, example: "Controls are mostly working but rely on people rather than the system. Fixing the payment block and moving evidence into the system would close the main gap within one quarter." },
+      "points[]": { desc: "most important first" },
+      "points[].point": { desc: "Finding or observation", max: 12, example: "Payments can start before vendor approval is recorded\nCheck evidence kept in email, not the system\nOnboarding takes 23 days against a 10-day target\nVendor master data has 9 duplicate records" },
+      "points[].rating": { desc: "Rating", allowed: "High, Medium, Low", example: "High\nMedium\nMedium\nLow" },
+      "points[].action": { desc: "Agreed action", max: 12, example: "Block payment until approval is recorded\nAttach evidence to each vendor record\nAdd turnaround tracking to the weekly report\nMerge duplicates and add a duplicate check" },
+      "points[].owner": { desc: "Person or team responsible", max: 3, example: "Procurement IT\nProcurement\nOperations\nFinance" },
+    },
+  },
+  test: {
+    report_title: "Review of vendor onboarding", team: "Group Operations", report_date: "19 October 2026",
+    background: "Vendor onboarding moved to a new system in March. Business units have reported delays, and two vendors were paid before their checks were complete.",
+    scope: "All 214 vendors onboarded between March and August 2026, across Singapore and Hong Kong. Contract terms and pricing were not reviewed.",
+    findings_summary: "Onboarding takes 23 days on average against a target of 10. Checks are done, but evidence is kept in emails, and the system lets payments start before approval is recorded.",
+    conclusion: "Controls are mostly working but rely on people rather than the system. Fixing the payment block and moving evidence into the system would close the main gap within one quarter.",
+    points: [
+      { point: "Payments can start before vendor approval is recorded", rating: "High", action: "Block payment until approval is recorded", owner: "Procurement IT" },
+      { point: "Check evidence kept in email, not the system", rating: "Medium", action: "Attach evidence to each vendor record", owner: "Procurement" },
+      { point: "Onboarding takes 23 days against a 10-day target", rating: "Medium", action: "Add turnaround tracking to the weekly report", owner: "Operations" },
+      { point: "Vendor master data has 9 duplicate records", rating: "Low", action: "Merge duplicates and add a duplicate check", owner: "Finance" },
+    ],
+  },
+};
+
+export const BRIEFS: Design[] = [brief, report, market, client, approval, project, quarterly];
