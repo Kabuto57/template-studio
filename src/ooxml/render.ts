@@ -2,7 +2,10 @@
 // scales with its width: the same markup serves the editor, the thumbnails and the gallery.
 import { PH } from "../engine/engine";
 import type { Deck } from "./deck";
+import { shapeByGeom } from "./shapes";
 import { A_NS, R_NS, dig, kid, kids, num, parseXml } from "./xml";
+
+const SVG_NS = "http://www.w3.org/2000/svg";
 
 type ClrMap = Record<string, string>;
 type Layer = "slide" | "layout" | "master";
@@ -390,12 +393,29 @@ class Painter {
     let fill = fillOf(deck, spPr, ctx.clrMap);
     const fillRef = kid(style, "fillRef");
     if (fill === undefined && fillRef && num(fillRef.getAttribute("idx")) > 0) fill = colorOf(deck, fillRef.firstElementChild, ctx.clrMap);
-    if (fill) div.style.background = fill;
     const ln = kid(spPr, "ln");
     let lnCol = ln ? fillOf(deck, ln, ctx.clrMap) : undefined;
     const lnRef = kid(style, "lnRef");
     if (lnCol === undefined && lnRef && num(lnRef.getAttribute("idx")) > 0 && !ln) lnCol = colorOf(deck, lnRef.firstElementChild, ctx.clrMap);
-    if (lnCol) div.style.border = `max(1px, ${this.u(num(ln?.getAttribute("w"), 9525))}) solid ${lnCol}`;
+    const lnW = `max(1px, ${this.u(num(ln?.getAttribute("w"), 9525))})`;
+    const shape = geom !== "rect" ? shapeByGeom(geom) : undefined;
+    if (shape) {
+      // non-rectangular presets are drawn as an SVG outline behind the text
+      const svg = document.createElementNS(SVG_NS, "svg");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      svg.setAttribute("preserveAspectRatio", "none");
+      svg.classList.add("geom");
+      const poly = document.createElementNS(SVG_NS, "polygon");
+      poly.setAttribute("points", shape.poly);
+      poly.setAttribute("vector-effect", "non-scaling-stroke");
+      poly.style.fill = fill || "none";
+      if (lnCol) { poly.style.stroke = lnCol; poly.style.strokeWidth = lnW; }
+      svg.appendChild(poly);
+      div.appendChild(svg);
+    } else {
+      if (fill) div.style.background = fill;
+      if (lnCol) div.style.border = `${lnW} solid ${lnCol}`;
+    }
     if (geom === "ellipse") div.style.borderRadius = "50%";
     if (geom === "roundRect") {
       const adj = dig(spPr, "prstGeom", "avLst")?.firstElementChild?.getAttribute("fmla");

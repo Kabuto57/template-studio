@@ -1,7 +1,8 @@
 // The panel on the right: format whatever is selected on the slide.
 import { scanPlaceholders } from "../engine/engine";
 import { cfgKeyOf } from "../model/fields";
-import { alignObj, deleteObj, duplicateObj, inches, IN, readBox, readStyle, selTextNode, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder, type Align, type FieldPayload, type Sel, type TableOp, type TextStyle } from "../ooxml/edit";
+import { alignObj, deleteObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, duplicateObj, inches, IN, readBox, readStyle, selTextNode, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder, type Align, type FieldPayload, type Sel, type TableOp, type TextStyle } from "../ooxml/edit";
+import { SHAPES } from "../ooxml/shapes";
 import { collectEditables, collectObjects, paraText } from "../ooxml/render";
 import { A_NS, esc, kid, kids, nodeXml, parseXml } from "../ooxml/xml";
 import { $, ICON, debounce, el, toast } from "./dom";
@@ -139,6 +140,34 @@ function styleSection(node: Element, title: string): HTMLElement {
   return sec;
 }
 
+const ROUND = [{ geom: "roundRect", label: "Rounded", icon: '<svg viewBox="-4 -4 108 108" aria-hidden="true"><rect width="100" height="100" rx="18" fill="currentColor"/></svg>' },
+  { geom: "ellipse", label: "Circle", icon: '<svg viewBox="-4 -4 108 108" aria-hidden="true"><circle cx="50" cy="50" r="50" fill="currentColor"/></svg>' }];
+/** Swap the shape's outline and set its border, like PowerPoint's Shape Format tab. */
+function shapeSection(node: Element): HTMLElement | null {
+  const geom = readGeom(node);
+  if (geom === null || kid(kid(node, "nvSpPr"), "cNvSpPr")?.getAttribute("txBox") === "1") return null; // plain text boxes don't need it
+  const sec = el("div", { class: "sect" });
+  sec.appendChild(el("div", { class: "sect-title" }, "Shape"));
+  const grid = el("div", { class: "shape-grid small", role: "group", "aria-label": "Change shape" });
+  for (const s of [...ROUND, ...SHAPES.map(x => ({ geom: x.geom, label: x.label, icon: `<svg viewBox="-4 -4 108 108" aria-hidden="true"><polygon points="${x.poly}" fill="currentColor"/></svg>` }))]) {
+    const b = el("button", { class: "shape-btn", type: "button", title: s.label, "aria-label": `Change to ${s.label.toLowerCase()}`, "aria-pressed": String(geom === s.geom) }, s.icon);
+    b.addEventListener("click", () => { if (setGeom(S.deck, S.cur, S.sel.obj, s.geom)) ui.refresh(); });
+    grid.appendChild(b);
+  }
+  sec.appendChild(grid);
+  const out = readOutline(node);
+  sec.appendChild(colourControl("Outline", out.color, hex => { if (setOutline(S.deck, S.cur, S.sel.obj, hex)) ui.refresh(); }, true));
+  if (out.color) {
+    const w = el("select", { class: "inp", "aria-label": "Outline width" },
+      [[0.75, "Hairline"], [1.5, "Thin"], [3, "Medium"], [6, "Thick"]].map(([v, n]) => `<option value="${v}">${n}</option>`).join(""));
+    const pt = out.w / 12700;
+    w.value = String([0.75, 1.5, 3, 6].reduce((a, b) => Math.abs(b - pt) < Math.abs(a - pt) ? b : a));
+    w.addEventListener("change", () => { if (setOutline(S.deck, S.cur, S.sel.obj, out.color, +w.value)) ui.refresh(); });
+    sec.appendChild(w);
+  }
+  return sec;
+}
+
 function arrangeSection(node: Element): HTMLElement | null {
   const info = S.deck.slides[S.cur]!;
   const b = readBox(S.deck, node, info);
@@ -165,6 +194,16 @@ function arrangeSection(node: Element): HTMLElement | null {
     g.appendChild(w);
   }
   sec.appendChild(g);
+  const rot = readRotation(node);
+  if (rot !== null) {
+    const r = el("div", { class: "row tight" });
+    const i = el("input", { class: "inp", id: "pos-rot", type: "number", step: "15", value: String(rot), style: "width:90px;flex:none" });
+    i.addEventListener("change", () => { if (setRotation(S.deck, S.cur, S.sel.obj, parseFloat(i.value) || 0)) ui.refresh(); });
+    const turn = el("button", { class: "btn small", type: "button" }, "Rotate 90\u00B0");
+    turn.addEventListener("click", () => { if (setRotation(S.deck, S.cur, S.sel.obj, rot + 90)) ui.refresh(); });
+    r.append(i, turn);
+    sec.append(el("label", { class: "lbl", for: "pos-rot" }, "Rotation (degrees)"), r);
+  }
   return sec;
 }
 
@@ -235,6 +274,7 @@ export function renderInspector(): void {
   if (fs) host.appendChild(fs);
   if (textNode) host.appendChild(styleSection(textNode, cell ? "Cell style" : "Style"));
   else if (node.localName === "sp") host.appendChild(styleSection(node, "Style"));
+  if (!cell) { const sh = shapeSection(node); if (sh) host.appendChild(sh); }
   const arrange = arrangeSection(node);
   if (arrange) host.appendChild(arrange);
   host.scrollTop = scroll;

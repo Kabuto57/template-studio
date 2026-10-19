@@ -7,7 +7,7 @@ import { deleteSelected, duplicateSelected, renderInspector } from "./inspector"
 import { renderCodePage, renderTestPanel } from "./outputs";
 import { downloadKit, exampleText, openFile, restoreOrSample, save } from "./project";
 import { renderInsertBar, renderSide } from "./side";
-import { drawOverlay, renderStage, wireStage } from "./stage";
+import { doInsertImage, drawOverlay, renderStage, wireStage } from "./stage";
 import { S, clearSel, ui, type SideTab, type View } from "./state";
 
 declare const __APP_VERSION__: string;
@@ -104,6 +104,12 @@ function wire(): void {
   const name = $<HTMLInputElement>("#projName");
   name.addEventListener("input", () => { S.project.name = name.value; save(); });
   name.addEventListener("keydown", e => { if (e.key === "Enter") name.blur(); });
+  $<HTMLInputElement>("#imageInput").addEventListener("change", e => {
+    const input = e.target as HTMLInputElement;
+    const f = input.files?.[0];
+    if (f) { if (S.view !== "design") setView("design"); void doInsertImage(f); }
+    input.value = "";
+  });
   $<HTMLInputElement>("#fileInput").addEventListener("change", e => {
     const input = e.target as HTMLInputElement;
     const f = input.files?.[0];

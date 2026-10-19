@@ -1,7 +1,7 @@
 // The slide in the middle and the filmstrip under it: drawing, selection, move/resize,
 // and drops from the Elements and Fields panels.
 import { fillXml, isSlidePart, newReport, parseContent, type Data, type Report } from "../engine/engine";
-import { BLOCKS, addBlankSlide, blockDef, blockSize, deleteSlide, duplicateSlide, inches, insertBlock, moveSlide, placeField, readBox, resizeBox, setBox, snap, type BlockType, type FieldPayload, type Rect } from "../ooxml/edit";
+import { BLOCKS, addBlankSlide, copyObj, deleteObj, insertImage, pasteObj, type Clip, blockDef, blockSize, deleteSlide, duplicateSlide, inches, insertBlock, moveSlide, placeField, readBox, resizeBox, setBox, snap, type BlockType, type FieldPayload, type Rect } from "../ooxml/edit";
 import { collectObjects, fitPlaceholderBoxes, renderSlide } from "../ooxml/render";
 import { esc, parseXml } from "../ooxml/xml";
 import { $, ICON, el, toast } from "./dom";
@@ -258,6 +258,52 @@ export function doInsertBlock(type: BlockType, centre?: { x: number; y: number }
   toast(made.note ? `Added ${made.label.toLowerCase()} with ${made.note}` : `Added ${made.label.toLowerCase()}`);
 }
 
+/**
+ * Add a picture. Big images are scaled to 1600 px and re-encoded, because the template, pictures
+ * included, is built into the generated Python and has to stay small enough for Dify.
+ */
+export async function doInsertImage(file: File): Promise<void> {
+  let bmp: ImageBitmap;
+  try { bmp = await createImageBitmap(file); } catch { toast("That file isn't a picture this browser can read."); return; }
+  const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+  const keep = (file.type === "image/png" || file.type === "image/jpeg") && k === 1 && file.size <= 200_000;
+  let data: Uint8Array, ext: "png" | "jpeg" = file.type === "image/jpeg" ? "jpeg" : "png";
+  if (keep) data = new Uint8Array(await file.arrayBuffer());
+  else {
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    const g = c.getContext("2d")!;
+    g.drawImage(bmp, 0, 0, c.width, c.height);
+    // a picture with no see-through pixels is much smaller as a JPEG
+    if (ext === "png" && !g.getImageData(0, 0, c.width, c.height).data.some((v, i) => i % 4 === 3 && v < 255)) ext = "jpeg";
+    const blob = await new Promise<Blob | null>(r => c.toBlob(r, `image/${ext}`, 0.85));
+    if (!blob) { toast("Couldn't prepare that picture."); return; }
+    data = new Uint8Array(await blob.arrayBuffer());
+  }
+  const obj = insertImage(S.deck, S.cur, data, ext, bmp.width, bmp.height);
+  bmp.close();
+  if (obj === null) return;
+  S.sel = { obj, cell: null };
+  S.selField = null;
+  ui.refresh();
+  toast(`Added picture (${Math.round(data.length / 1024)} KB)`);
+}
+
+let clip: Clip | null = null;
+const CLIP_MARK = "[Template Studio element]";
+export function copySelected(): boolean {
+  clip = copyObj(S.deck, S.cur, S.sel.obj);
+  return !!clip;
+}
+export function pasteClip(): boolean {
+  if (!clip) return false;
+  const obj = pasteObj(S.deck, S.cur, clip);
+  if (obj === null) return false;
+  S.sel = { obj, cell: null };
+  ui.refresh();
+  return true;
+}
+
 export function doPlaceField(editIdx: number, payload: FieldPayload): void {
   const placed = placeField(S.deck, S.cur, editIdx, payload);
   if (!placed) return;
@@ -295,7 +341,7 @@ export function wireStage(openFile: (f: File) => void): void {
   stage.addEventListener("drop", e => {
     stage.classList.remove("file-over");
     const f = e.dataTransfer?.files?.[0];
-    if (f) { e.preventDefault(); clearDropMarks(); return openFile(f); }
+    if (f) { e.preventDefault(); clearDropMarks(); return f.type.startsWith("image/") && S.view === "design" ? doInsertImage(f) : openFile(f); }
     if (!dragInfo || S.view !== "design") return;
     e.preventDefault();
     const info = dragInfo;
@@ -306,6 +352,23 @@ export function wireStage(openFile: (f: File) => void): void {
     if (info.kind === "block") { if (p?.inside) doInsertBlock(info.type, p); return; }
     if (!target) { toast("Drop the field onto a text box or a table cell."); return; }
     doPlaceField(+target.dataset.edit!, info.payload);
+  });
+  // Ctrl+C / Ctrl+X / Ctrl+V. The system clipboard gets a marker, so a screenshot copied later
+  // pastes as a picture instead of the element copied earlier.
+  const typingIn = (e: Event) => S.view !== "design" || !!(e.target as Element).closest?.("input, textarea, select, [contenteditable], dialog");
+  const onCopy = (e: ClipboardEvent, cut: boolean) => {
+    if (typingIn(e) || S.sel.obj === null || document.getSelection()?.toString() || !copySelected()) return;
+    e.preventDefault();
+    e.clipboardData?.setData("text/plain", CLIP_MARK);
+    if (cut && deleteObj(S.deck, S.cur, S.sel.obj)) { clearSel(); ui.refresh(); }
+  };
+  document.addEventListener("copy", e => onCopy(e, false));
+  document.addEventListener("cut", e => onCopy(e, true));
+  document.addEventListener("paste", e => {
+    if (typingIn(e)) return;
+    const f = [...(e.clipboardData?.files ?? [])].find(x => x.type.startsWith("image/"));
+    if (f) { e.preventDefault(); void doInsertImage(f); }
+    else if (e.clipboardData?.getData("text/plain") === CLIP_MARK && pasteClip()) e.preventDefault();
   });
   let resizeTimer: ReturnType<typeof setTimeout>;
   window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (S.view === "design") drawOverlay(); }, 100); });

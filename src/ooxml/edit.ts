@@ -10,6 +10,7 @@ import { rewritePlaceholders, isSlidePart, scanPlaceholders, visibleText, xmlEsc
 import { rootOf, type Project } from "../model/fields";
 import type { Deck, SlideInfo } from "./deck";
 import { collectEditables, collectObjects, findPh, paraText, phOf, xfrmOf, type Editable } from "./render";
+import { SHAPES } from "./shapes";
 import { A_NS, CT_NS, P_NS, PR_NS, R_NS, XML_DECL, dig, kid, kids, nodeXml, num, parseXml, relTarget, relsPathOf, resolvePath, serializeXml } from "./xml";
 
 export const IN = 914400;      // EMU per inch
@@ -89,7 +90,7 @@ export function resizeBox(b: Rect, h: string, dx: number, dy: number): Rect {
 export interface ParaSpec { text: string; sz?: number; b?: boolean; i?: boolean; color?: string; font?: string; algn?: "l" | "ctr" | "r"; bullet?: boolean; spc?: number; after?: number; line?: number }
 export interface ShapeSpec {
   id: number; name: string; box: Rect; paras?: ParaSpec[]; fill?: string | null; line?: string | null; lineW?: number;
-  geom?: "rect" | "roundRect" | "ellipse"; radius?: number; anchor?: "t" | "ctr" | "b"; ins?: number; txBox?: boolean;
+  geom?: string; radius?: number; anchor?: "t" | "ctr" | "b"; ins?: number; txBox?: boolean;
 }
 export interface CellStyle { sz?: number; b?: boolean; color?: string; fill?: string | null; anchor?: string; font?: string; border?: string | null; algn?: "l" | "ctr" | "r" }
 export interface TableSpec {
@@ -145,20 +146,37 @@ export function tableXml({ id, name, box, list, cols, rows, head = {}, body = {}
 }
 
 /* ---------------------------------------------------------------- blocks */
-export type BlockType = "title" | "text" | "bullets" | "number" | "table" | "label" | "box" | "circle" | "line";
+export type BlockType = "title" | "subtitle" | "text" | "bullets" | "quote" | "callout" | "number" | "table" | "label" | "tag" | "box" | "frame" | "circle" | "line" | `shape:${string}`;
 export interface BlockDef { type: BlockType; label: string; w: number; h: number; base?: string; hint: string }
 export const BLOCKS: BlockDef[] = [
   { type: "title", label: "Title", w: 8, h: 0.9, base: "title", hint: "A heading with its own field" },
+  { type: "subtitle", label: "Subtitle", w: 8, h: 0.6, base: "subtitle", hint: "A line under a title" },
   { type: "text", label: "Text", w: 5, h: 1.4, base: "text", hint: "A paragraph the LLM writes" },
   { type: "bullets", label: "Bullet list", w: 5, h: 2.2, base: "points", hint: "One bullet per list item" },
+  { type: "quote", label: "Quote", w: 7, h: 1.4, base: "quote", hint: "A pull quote in large italics" },
+  { type: "callout", label: "Callout", w: 4, h: 1.6, base: "callout", hint: "A message in a coloured panel" },
   { type: "number", label: "Number tile", w: 2.4, h: 1.5, base: "number", hint: "A big figure with a label" },
   { type: "table", label: "Table", w: 8, h: 1.86, base: "rows", hint: "One row per list item" },
   { type: "label", label: "Label", w: 3, h: 0.45, hint: "Fixed text, such as a heading" },
+  { type: "tag", label: "Tag", w: 1.4, h: 0.4, hint: "A small coloured pill with fixed text" },
   { type: "box", label: "Box", w: 3, h: 2, hint: "A rounded panel" },
+  { type: "frame", label: "Frame", w: 3, h: 2, hint: "An outline with no fill" },
   { type: "circle", label: "Circle", w: 1.6, h: 1.6, hint: "A round accent" },
   { type: "line", label: "Divider", w: 4, h: 0.04, hint: "A thin rule" },
 ];
-export const blockDef = (t: string): BlockDef | undefined => BLOCKS.find(b => b.type === t);
+/** Every preset shape is a block too, so it can be clicked or dragged in like the others. */
+export const SHAPE_BLOCKS: BlockDef[] = SHAPES.map(s => ({ type: `shape:${s.geom}`, label: s.label, w: s.w, h: s.h, hint: "A shape" }));
+export const blockDef = (t: string): BlockDef | undefined => BLOCKS.find(b => b.type === t) ?? SHAPE_BLOCKS.find(b => b.type === t);
+
+/** The template's own accent: its most used colour that isn't white, black or grey. New shapes take it. */
+export function accentOf(deck: Deck): string {
+  const count = new Map<string, number>();
+  for (const sl of deck.slides) for (const m of (deck.texts[sl.path] ?? "").matchAll(/<a:srgbClr val="([0-9A-Fa-f]{6})"/g)) {
+    const c = m[1]!.toUpperCase(), [r, g, b] = [0, 2, 4].map(i => parseInt(c.slice(i, i + 2), 16)) as [number, number, number];
+    if (Math.max(r, g, b) - Math.min(r, g, b) > 60) count.set(c, (count.get(c) ?? 0) + 1);
+  }
+  return [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "2B6CB0";
+}
 export function blockSize(deck: Deck, def: BlockDef): { cx: number; cy: number } {
   return { cx: snap(Math.min(def.w * IN, deck.W - 0.4 * IN)), cy: Math.max(GRID, snap(Math.min(def.h * IN, deck.H - 0.4 * IN))) };
 }
@@ -191,10 +209,18 @@ function blockXml(deck: Deck, project: Project, type: BlockType, id: number, box
   const def = blockDef(type)!;
   const key = def.base ? uniqueKey(deck, project, def.base) : "";
   const field = `{{${key}}}`;
-  const NAVY = "16253D";
+  const NAVY = "16253D", ACC = accentOf(deck);
+  if (type.startsWith("shape:")) return { note: "", xml: shapeXml({ id, name: `${def.label} ${id}`, box, fill: ACC, geom: type.slice(6) }) };
   switch (type) {
     case "title": return { note: field, xml: shapeXml({ id, name: `Title ${id}`, box, paras: [{ text: field, sz: 32, b: true, color: NAVY }] }) };
+    case "subtitle": return { note: field, xml: shapeXml({ id, name: `Subtitle ${id}`, box, paras: [{ text: field, sz: 20, color: "5F6B7A" }] }) };
     case "text": return { note: field, xml: shapeXml({ id, name: `Text ${id}`, box, paras: [{ text: field, sz: 16 }] }) };
+    case "quote": return { note: field, xml: shapeXml({ id, name: `Quote ${id}`, box, paras: [{ text: `\u201C${field}\u201D`, sz: 24, i: true, color: NAVY }] }) };
+    case "callout": return { note: field, xml: shapeXml({ id, name: `Callout ${id}`, box, fill: ACC, geom: "roundRect", radius: 6000, ins: 182880, anchor: "ctr", txBox: false,
+      paras: [{ text: field, sz: 16, b: true, color: "FFFFFF" }] }) };
+    case "tag": return { note: "", xml: shapeXml({ id, name: `Tag ${id}`, box, fill: ACC, geom: "roundRect", radius: 50000, anchor: "ctr", txBox: false,
+      paras: [{ text: "Tag", sz: 12, b: true, color: "FFFFFF", algn: "ctr" }] }) };
+    case "frame": return { note: "", xml: shapeXml({ id, name: `Frame ${id}`, box, line: ACC, lineW: 19050 }) };
     case "bullets":
       (project.fields[key] ??= {}).type = "list";
       return { note: field, xml: shapeXml({ id, name: `Bullets ${id}`, box, paras: [{ text: field, sz: 16, bullet: true }] }) };
@@ -397,6 +423,133 @@ export function duplicateObj(deck: Deck, slide: number, obj: number | null): num
   });
   return ok ? idx : null;
 }
+
+/* ---------------------------------------------------------------- pictures */
+/** Add a picture to a slide, fitted inside 6 x 4 in and centred. Returns the new object's index. */
+export function insertImage(deck: Deck, slide: number, data: Uint8Array, ext: "png" | "jpeg", w: number, h: number): number | null {
+  const info = deck.slides[slide];
+  if (!info || !w || !h) return null;
+  let n = 1;
+  while (deck.zip.has(`ppt/media/image${n}.png`) || deck.zip.has(`ppt/media/image${n}.jpeg`)) n++;
+  const media = `ppt/media/image${n}.${ext}`;
+  // ponytail: the image bytes sit outside undo; undoing leaves an unused image in the file, which PowerPoint ignores
+  deck.zip.set(media, data);
+  try { deck.media[media] = URL.createObjectURL(new Blob([data as BlobPart], { type: `image/${ext}` })); } catch { /* no preview; the file still has the picture */ }
+  const k = Math.min(6 * IN / w, 4 * IN / h);
+  const cx = snap(w * k), cy = snap(h * k);
+  const box = { cx, cy, x: snap((deck.W - cx) / 2), y: snap((deck.H - cy) / 2) };
+  let obj: number | null = null;
+  deck.transaction(put => {
+    const ct = deck.texts["[Content_Types].xml"]!;
+    if (!new RegExp(`Extension="${ext}"`, "i").test(ct)) put("[Content_Types].xml", ct.replace(/(<Types[^>]*>)/, `$1<Default Extension="${ext}" ContentType="image/${ext}"/>`));
+    const rid = addRel(deck, info.path, put, media);
+    const doc = parseXml(deck.texts[info.path]!);
+    const id = nextShapeId(doc);
+    dig(doc.documentElement, "cSld", "spTree")!.appendChild(importXml(doc, picXml(id, rid, box)));
+    obj = collectObjects(doc).length - 1;
+    put(info.path, serializeXml(doc));
+  });
+  return obj;
+}
+const REL_IMAGE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+/** Point the slide at a media part, reusing an existing relationship if there is one. Returns its id. */
+function addRel(deck: Deck, part: string, put: (p: string, x: string) => void, target: string): string {
+  const existing = Object.entries(deck.relsOf(part)).find(([, r]) => r.target === target);
+  if (existing) return existing[0];
+  const path = relsPathOf(part), xml = deck.texts[path] ?? `${XML_DECL}<Relationships xmlns="${PR_NS}"></Relationships>`;
+  let i = 1;
+  while (xml.includes(`Id="rIdImg${i}"`)) i++;
+  put(path, xml.replace("</Relationships>", `<Relationship Id="rIdImg${i}" Type="${REL_IMAGE}" Target="${relTarget(part, target)}"/></Relationships>`));
+  return `rIdImg${i}`;
+}
+const picXml = (id: number, rid: string, b: Rect): string =>
+  `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="Picture ${id}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>` +
+  `<p:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>` +
+  `<p:spPr><a:xfrm><a:off x="${b.x}" y="${b.y}"/><a:ext cx="${b.cx}" cy="${b.cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+
+/* ---------------------------------------------------------------- copy and paste */
+/** A copied object: its XML, plus the media its pictures point at, keyed by relationship id. */
+export interface Clip { xml: string; media: Record<string, string> }
+const embedsOf = (node: Element): Element[] => [...node.getElementsByTagNameNS(A_NS, "blip")];
+export function copyObj(deck: Deck, slide: number, obj: number | null): Clip | null {
+  const info = deck.slides[slide];
+  const node = info && obj !== null ? collectObjects(parseXml(deck.texts[info.path]!))[obj] : undefined;
+  if (!info || !node) return null;
+  const rels = deck.relsOf(info.path), media: Record<string, string> = {};
+  for (const b of embedsOf(node)) {
+    const rid = b.getAttributeNS(R_NS, "embed") ?? "", t = rels[rid]?.target;
+    if (t) media[rid] = t;
+  }
+  return { xml: nodeXml(node), media };
+}
+/** Paste a copied object onto a slide, nudged so it doesn't sit exactly on its original. */
+export function pasteObj(deck: Deck, slide: number, clip: Clip): number | null {
+  const info = deck.slides[slide];
+  if (!info) return null;
+  let obj: number | null = null;
+  deck.transaction(put => {
+    const doc = parseXml(deck.texts[info.path]!);
+    const node = importXml(doc, clip.xml);
+    for (const b of embedsOf(node)) {
+      const t = clip.media[b.getAttributeNS(R_NS, "embed") ?? ""];
+      if (t && deck.zip.has(t)) b.setAttributeNS(R_NS, "r:embed", addRel(deck, info.path, put, t));
+    }
+    const cnv = [...node.getElementsByTagName("*")].find(e => e.localName === "cNvPr");
+    if (cnv) cnv.setAttribute("id", String(nextShapeId(doc)));
+    dig(doc.documentElement, "cSld", "spTree")!.appendChild(node);
+    const b = readBox(deck, node, info);
+    if (b) writeBox(node, { ...b, x: Math.min(b.x + GRID * 4, deck.W - b.cx), y: Math.min(b.y + GRID * 4, deck.H - b.cy) });
+    obj = collectObjects(doc).length - 1;
+    put(info.path, serializeXml(doc));
+  });
+  return obj;
+}
+
+/* ---------------------------------------------------------------- shape look */
+export function readGeom(node: Element): string | null {
+  return node.localName === "sp" ? dig(node, "spPr", "prstGeom")?.getAttribute("prst") ?? (dig(node, "spPr", "custGeom") ? null : "rect") : null;
+}
+/** Swap a shape's outline for another preset, keeping its size, fill and text. */
+export function setGeom(deck: Deck, slide: number, obj: number | null, geom: string): boolean {
+  return editObj(deck, slide, obj, (node, doc) => {
+    const spPr = kid(node, "spPr");
+    if (node.localName !== "sp" || !spPr) return false;
+    kid(spPr, "custGeom")?.remove();
+    let pg = kid(spPr, "prstGeom");
+    if (!pg) { pg = doc.createElementNS(A_NS, "a:prstGeom"); spPr.insertBefore(pg, kid(spPr, "xfrm")?.nextSibling ?? spPr.firstChild); }
+    pg.setAttribute("prst", geom);
+    pg.replaceChildren(doc.createElementNS(A_NS, "a:avLst"));
+  });
+}
+export function readOutline(node: Element): { color: string | null; w: number } {
+  const ln = dig(node, "spPr", "ln");
+  return { color: ln ? dig(ln, "solidFill", "srgbClr")?.getAttribute("val") ?? null : null, w: num(ln?.getAttribute("w"), 12700) };
+}
+/** Outline colour (null removes it) and width in points. */
+export function setOutline(deck: Deck, slide: number, obj: number | null, color: string | null, pt?: number): boolean {
+  return editObj(deck, slide, obj, (node, doc) => {
+    const spPr = kid(node, "spPr");
+    if (!spPr) return false;
+    let ln = kid(spPr, "ln");
+    if (!ln) { ln = doc.createElementNS(A_NS, "a:ln"); spPr.insertBefore(ln, [...spPr.children].find(c => ["effectLst", "effectDag", "scene3d", "sp3d", "extLst"].includes(c.localName)) ?? null); }
+    if (color === null) ln.removeAttribute("w");
+    else ln.setAttribute("w", String(Math.round((pt ?? (num(ln.getAttribute("w"), 0) / 12700 || 1.5)) * 12700)));
+    setSolid(ln, color, ["prstDash", "custDash", "round", "bevel", "miter", "headEnd", "tailEnd", "extLst"]);
+  }, "outline");
+}
+/** Rotation in degrees, for shapes and pictures. */
+export function setRotation(deck: Deck, slide: number, obj: number | null, deg: number): boolean {
+  return editObj(deck, slide, obj, node => {
+    const x = dig(node, "spPr", "xfrm");
+    if (!x) return false;
+    const r = Math.round((((deg % 360) + 360) % 360) * 60000);
+    if (r) x.setAttribute("rot", String(r)); else x.removeAttribute("rot");
+  }, "rotate");
+}
+export const readRotation = (node: Element): number | null => {
+  const x = dig(node, "spPr", "xfrm");
+  return x ? Math.round(num(x.getAttribute("rot")) / 60000) : null;
+};
 
 export function zOrder(deck: Deck, slide: number, obj: number | null, where: "front" | "back"): number | null {
   let idx: number | null = null;

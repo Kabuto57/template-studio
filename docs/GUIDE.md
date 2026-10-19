@@ -47,7 +47,7 @@ derives the prompt, the schema and the code from them, so the three can never di
 
 | Step | Screen | What happens |
 |---|---|---|
-| 1 | **Design** | Pick one of six designs, start blank, or open a `.pptx`. Drag elements and fields onto the slide. Describe each field for the LLM (what to write, word limit, example, allowed values). |
+| 1 | **Design** | Pick one of thirteen designs (seven bank briefs first), start blank, or open a `.pptx`. Add text, tables, pictures and shapes from the Insert ribbon above the slide (click, or drag into place); paste screenshots with Ctrl+V; copy elements between slides with Ctrl+C / Ctrl+V. Drag fields onto the slide. Describe each field for the LLM (what to write, word limit, example, allowed values). |
 | 2 | **Test** | Paste JSON an LLM returned. The slides fill live and the panel lists anything left blank. Download the filled deck. |
 | 3 | **Get code** | Copy the prompt, the example JSON or JSON Schema, and the Python. Or download everything as a zip. |
 
@@ -271,7 +271,7 @@ field settings from it.
 | `state.ts` | The single state object `S` (deck, project, model, current slide, selection, view). |
 | `app.ts` | Start-up, switching views, keyboard shortcuts, the About dialog. |
 | `stage.ts` | The slide canvas: selection outline, drag to move, handles to resize, drag-and-drop targets, the filmstrip. |
-| `side.ts` | Left panel: Designs gallery, Elements, Settings. |
+| `side.ts` | Left panel (Designs gallery, Elements, Settings) and the Insert ribbon above the slide. |
 | `fields.ts` | Left panel: the field list and each field's settings. |
 | `inspector.ts` | Right panel: text, font, colours, alignment, arrange, slide background. |
 | `outputs.ts` | Test panel and the Get code page. |
@@ -414,6 +414,8 @@ Paths are relative, so the same build works under any URL.
 Everything used is free: GitHub Pages, GitHub Actions for public repositories, open-source tools.
 
 # 16. How to extend it
+
+**Add a shape.** Add an entry to `SHAPES` in `src/ooxml/shapes.ts`: a valid PowerPoint preset name and its outline for the screen.
 
 **Add an element type.** Add an entry to `BLOCKS` in `src/ooxml/edit.ts`, return its XML from
 `blockXml`, and add a small picture to `BLOCK_ART` in `src/ui/side.ts`. A test inserts every block type

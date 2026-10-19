@@ -10,7 +10,7 @@ import { fillXml, isSlidePart, newReport, type Data } from "../../src/engine/eng
 import { buildExample, buildModel, buildPrompt, buildSchema, cfgKeyOf, normaliseProject, projectForCode, type Project } from "../../src/model/fields";
 import { buildPython, displayPython, parsePythonFile } from "../../src/model/python";
 import { Deck } from "../../src/ooxml/deck";
-import { BLOCKS, addBlankSlide, alignObj, deleteObj, deleteSlide, duplicateObj, duplicateSlide, insertBlock, moveSlide, placeField, renameField, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder } from "../../src/ooxml/edit";
+import { BLOCKS, SHAPE_BLOCKS, addBlankSlide, copyObj, insertImage, pasteObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, alignObj, deleteObj, deleteSlide, duplicateObj, duplicateSlide, insertBlock, moveSlide, placeField, renameField, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder } from "../../src/ooxml/edit";
 import { collectEditables, collectObjects, renderSlide } from "../../src/ooxml/render";
 import { bytesToB64, b64ToBytes, parseXml } from "../../src/ooxml/xml";
 import { buildDeck } from "../../src/templates/builder";
@@ -346,6 +346,40 @@ describe("editing", () => {
     write("edited_filled.pptx", await filled(deck, data, project));
     const again = await Deck.load(b64ToBytes(bytesToB64(await deck.bytes())));
     expect(again.scan()).toEqual(deck.scan());
+  });
+});
+
+describe("shapes, pictures and copy-paste", () => {
+  // a 1 x 1 red PNG
+  const PNG = b64ToBytes("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==");
+  it("inserts every shape and a picture, restyles them, and pastes the picture onto another slide", async () => {
+    const deck = await Deck.load(await buildDeck([{ els: [] }, { els: [] }], blank));
+    const project = normaliseProject({ name: "Shapes" });
+    for (const b of SHAPE_BLOCKS) expect(insertBlock(deck, project, 0, b.type), b.type).not.toBeNull();
+    const objs = () => collectObjects(parseXml(deck.texts[deck.slides[0]!.path]!));
+    expect(objs().map(readGeom)).toEqual(SHAPE_BLOCKS.map(b => b.type.slice(6)));
+
+    expect(setGeom(deck, 0, 0, "hexagon")).toBe(true);
+    expect(setOutline(deck, 0, 0, "111111", 3)).toBe(true);
+    expect(setRotation(deck, 0, 0, 45)).toBe(true);
+    expect(readGeom(objs()[0]!)).toBe("hexagon");
+    expect(readOutline(objs()[0]!)).toEqual({ color: "111111", w: 38100 });
+    expect(readRotation(objs()[0]!)).toBe(45);
+    expect(setOutline(deck, 0, 0, null)).toBe(true);
+    expect(readOutline(objs()[0]!).color).toBeNull();
+
+    const pic = insertImage(deck, 0, PNG, "png", 1, 1)!;
+    expect(objs()[pic]!.localName).toBe("pic");
+    expect(deck.texts["[Content_Types].xml"]).toContain('Extension="png"');
+    const clip = copyObj(deck, 0, pic)!;
+    expect(Object.values(clip.media)).toEqual(["ppt/media/image1.png"]);
+    const pasted = pasteObj(deck, 1, clip)!;
+    expect(Object.values(deck.relsOf(deck.slides[1]!.path)).some(r => r.target === "ppt/media/image1.png")).toBe(true);
+    expect(collectObjects(parseXml(deck.texts[deck.slides[1]!.path]!))[pasted]!.localName).toBe("pic");
+
+    const again = await Deck.load(await deck.bytes());
+    expect(again.zip.has("ppt/media/image1.png")).toBe(true);
+    write("shapes_and_picture.pptx", await deck.bytes());
   });
 });
 

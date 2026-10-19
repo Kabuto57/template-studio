@@ -323,6 +323,29 @@ test("private and offline: no requests after load, and it runs without a network
   expect(kit.suggestedFilename()).toMatch(/\.(zip|py)$/);
 });
 
+test("insert ribbon: shapes, a picture, copy and paste, and they reach the kit", async ({ page }) => {
+  const errors = watchErrors(page);
+  await startBlank(page);
+  await page.click("#pop-shapes");
+  await page.click(".ins-pop [data-type='shape:star5']");
+  await expect(page.locator(".ins-pop")).toHaveCount(0);
+  await expect(page.locator("#mainSlide svg.geom polygon")).toHaveCount(1);
+  await expect(page.locator("#insp h2")).toHaveText("Shape");
+  await page.click("#insp [aria-label='Change to hexagon']");
+  await expect(page.locator("#insp [aria-label='Change to hexagon']")).toHaveAttribute("aria-pressed", "true");
+  await page.setInputFiles("#imageInput", "docs/img/fields.png");
+  await expect(page.locator("#mainSlide img")).toHaveCount(1);
+  await expect(page.locator("#insp h2")).toHaveText("Picture");
+  await page.keyboard.press("ControlOrMeta+c");
+  await page.keyboard.press("ControlOrMeta+v");
+  await expect(page.locator("#mainSlide img")).toHaveCount(2);
+  const kit = await downloadKit(page, "ribbon_kit.zip");
+  const folder = kit.names()[0]!.split("/")[0]!;
+  const tpl = await Zip.load((await kit.bytes(`${folder}/template.pptx`))!);
+  expect(tpl.names().some(n => /^ppt\/media\/image1\.(png|jpeg)$/.test(n))).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test("keyboard and accessibility basics", async ({ page }) => {
   await open(page);
   // every control has an accessible name
