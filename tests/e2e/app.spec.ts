@@ -463,3 +463,16 @@ test("present the filled deck full screen, and step through it", async ({ page }
   await page.keyboard.press("Escape");
   await expect(page.locator(".show")).toHaveCount(0);
 });
+
+test("drag a slide in the filmstrip to reorder", async ({ page }) => {
+  await open(page);
+  await page.click("[data-design=brief]");
+  const thumbs = page.locator("#film .thumb");
+  await expect(thumbs).toHaveCount(3);
+  await thumbs.nth(0).dragTo(thumbs.nth(2), { targetPosition: { x: 120, y: 30 } });
+  await expect(page.locator("#mainSlide")).toContainText("EXECUTIVE BRIEF");
+  await expect(page.locator("#stageMeta")).toHaveText("Slide 3 of 3");
+  await page.click("#undoBtn");
+  await page.locator("#film .thumb").nth(0).click();
+  await expect(page.locator("#mainSlide")).toContainText("EXECUTIVE BRIEF");
+});

@@ -90,6 +90,31 @@ function renderFilm(filled: Record<string, string> | null): void {
       if (S.cur !== i) { S.cur = i; clearSel(); ui.renderStage(); ui.renderInspector(); }
     });
     b.addEventListener("keydown", e => { if (e.key === "Enter" && e.target === b) b.click(); });
+    if (design) {
+      // drag a thumbnail to reorder slides, like PowerPoint's slide pane
+      b.draggable = true;
+      b.addEventListener("dragstart", e => { slideDrag = i; e.dataTransfer!.effectAllowed = "move"; e.dataTransfer!.setData("text/plain", `slide ${i + 1}`); b.classList.add("dragging"); });
+      b.addEventListener("dragend", () => { slideDrag = null; b.classList.remove("dragging"); film.querySelectorAll(".drop-before, .drop-after").forEach(x => x.classList.remove("drop-before", "drop-after")); });
+      b.addEventListener("dragover", e => {
+        if (slideDrag === null) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const r = b.getBoundingClientRect(), after = e.clientX > r.left + r.width / 2;
+        film.querySelectorAll(".drop-before, .drop-after").forEach(x => x.classList.remove("drop-before", "drop-after"));
+        b.classList.add(after ? "drop-after" : "drop-before");
+      });
+      b.addEventListener("drop", e => {
+        if (slideDrag === null) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const from = slideDrag, after = b.classList.contains("drop-after");
+        let to = i + (after ? 1 : 0);
+        if (from < to) to--;
+        slideDrag = null;
+        if (moveSlide(deck, from, to)) { S.cur = to; clearSel(); ui.refresh(); toast(`Moved to position ${to + 1}`); }
+        else ui.renderStage();
+      });
+    }
     film.appendChild(b);
   });
   if (design) {
@@ -126,6 +151,8 @@ function layoutArt(l: LayoutDef): string {
   }).join("");
   return `<svg viewBox="0 0 13.333 7.5" aria-hidden="true"><rect width="13.333" height="7.5" fill="#fff"/>${parts}</svg>`;
 }
+
+let slideDrag: number | null = null;
 
 function slideAction(act: string, i: number): void {
   const { deck } = S;

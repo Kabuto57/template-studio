@@ -417,3 +417,6 @@ table.io th { font-weight: 600; color: var(--muted); font-size: var(--fs-xs); }
 .show-stage > .slide { width: min(100cqw, calc(100cqh * var(--ar, 1.7778))); box-shadow: none; }
 .show-count { position: fixed; right: 16px; bottom: 12px; color: rgba(255, 255, 255, .55); font-size: 12px; font-variant-numeric: tabular-nums; pointer-events: none; }
 #presentBtn svg { width: 16px; height: 16px; stroke: none; margin-right: 2px; }
+.thumb.dragging { opacity: .4; }
+.thumb.drop-before { box-shadow: -4px 0 0 var(--primary); }
+.thumb.drop-after { box-shadow: 4px 0 0 var(--primary); }
