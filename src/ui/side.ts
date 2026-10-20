@@ -121,6 +121,7 @@ const BLOCK_ART: Partial<Record<BlockType, string>> = {
   frame: `<rect x="27" y="11" width="66" height="40" fill="none" stroke="${D}" stroke-width="3"/>`,
   circle: `<circle cx="60" cy="31" r="22" fill="${L}"/>`,
   line: `<rect x="16" y="29.5" width="88" height="3" rx="1.5" fill="${D}"/>`,
+  arrow: `<rect x="16" y="29.5" width="76" height="3" rx="1.5" fill="${D}"/><path d="M90 22 104 31 90 40z" fill="${D}"/>`,
 };
 const PICTURE_ART = `<rect x="28" y="9" width="64" height="44" rx="5" fill="${L}"/><circle cx="44" cy="23" r="6" fill="#fff"/><path d="M28 47 50 30l14 11 10-7 18 13v1a5 5 0 0 1-5 5H33a5 5 0 0 1-5-5z" fill="${D}"/>`;
 /** The little picture on a block's button. */
@@ -145,7 +146,7 @@ function blockCard(b: BlockDef, compact = false): HTMLElement {
 }
 const defs = (types: BlockType[]): BlockDef[] => types.map(t => blockDef(t)!);
 const TEXT: BlockType[] = ["title", "subtitle", "text", "bullets", "quote", "callout", "label", "tag"];
-const BASIC_SHAPES: BlockType[] = ["box", "frame", "circle", "line"];
+const BASIC_SHAPES: BlockType[] = ["box", "frame", "circle", "line", "arrow"];
 
 /** Colour swatches plus a grid of icons; clicking one adds it in the chosen colour. */
 let iconColour = "";
@@ -250,7 +251,7 @@ export function renderInsertBar(): void {
     g.append(...[...defs(BASIC_SHAPES), ...SHAPE_BLOCKS].map(b => blockCard(b, true)));
     pop.appendChild(g);
   }), undefined, true);
-  group("Draw", shapes, blockBtn("line"));
+  group("Draw", shapes, blockBtn("arrow"), blockBtn("line"));
   document.addEventListener("pointerdown", e => { if (openPop && !(e.target as Element).closest(".ins-pop, .ins-btn.more, [aria-haspopup]")) closePop(); });
   document.addEventListener("keydown", e => { if (e.key === "Escape" && openPop) { const a = document.getElementById(openPop.dataset.for!); closePop(); a?.focus(); } });
   document.addEventListener("dragstart", closePop);

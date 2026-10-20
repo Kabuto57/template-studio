@@ -146,7 +146,7 @@ export function tableXml({ id, name, box, list, cols, rows, head = {}, body = {}
 }
 
 /* ---------------------------------------------------------------- blocks */
-export type BlockType = "title" | "subtitle" | "text" | "bullets" | "quote" | "callout" | "number" | "table" | "label" | "tag" | "box" | "frame" | "circle" | "line" | `shape:${string}`;
+export type BlockType = "title" | "subtitle" | "text" | "bullets" | "quote" | "callout" | "number" | "table" | "label" | "tag" | "box" | "frame" | "circle" | "line" | "arrow" | `shape:${string}`;
 export interface BlockDef { type: BlockType; label: string; w: number; h: number; base?: string; hint: string }
 export const BLOCKS: BlockDef[] = [
   { type: "title", label: "Title", w: 8, h: 0.9, base: "title", hint: "A heading with its own field" },
@@ -161,6 +161,7 @@ export const BLOCKS: BlockDef[] = [
   { type: "tag", label: "Tag", w: 1.4, h: 0.4, hint: "A small coloured pill with fixed text" },
   { type: "box", label: "Box", w: 3, h: 2, hint: "A rounded panel" },
   { type: "frame", label: "Frame", w: 3, h: 2, hint: "An outline with no fill" },
+  { type: "arrow", label: "Arrow", w: 3, h: 0, hint: "A line with an arrowhead" },
   { type: "circle", label: "Circle", w: 1.6, h: 1.6, hint: "A round accent" },
   { type: "line", label: "Divider", w: 4, h: 0.04, hint: "A thin rule" },
 ];
@@ -246,6 +247,9 @@ function blockXml(deck: Deck, project: Project, type: BlockType, id: number, box
         head: { fill: NAVY, color: "FFFFFF", font, sz: 12, b: true }, body: { font, color: NAVY },
         cols: [{ key: "name", label: "Name" }, { key: "detail", label: "Detail" }, { key: "status", label: "Status" }] }) };
     case "label": return { note: "", xml: shapeXml({ id, name: `Label ${id}`, box, paras: [{ text: "Label", sz: 14, b: true, color: NAVY, font }] }) };
+    case "arrow": return { note: "", xml: `<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="${id}" name="Arrow ${id}"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr>` +
+      `<p:spPr><a:xfrm><a:off x="${box.x}" y="${box.y}"/><a:ext cx="${box.cx}" cy="0"/></a:xfrm><a:prstGeom prst="straightConnector1"><a:avLst/></a:prstGeom>` +
+      `<a:ln w="25400"><a:solidFill><a:srgbClr val="${NAVY}"/></a:solidFill><a:tailEnd type="triangle"/></a:ln></p:spPr></p:cxnSp>` };
     case "circle": return { note: "", xml: shapeXml({ id, name: `Circle ${id}`, box, fill: "D7E3F4", geom: "ellipse" }) };
     case "line": return { note: "", xml: shapeXml({ id, name: `Divider ${id}`, box, fill: "C5CCD6" }) };
     default: return { note: "", xml: shapeXml({ id, name: `Box ${id}`, box, fill: look.panel, geom: "roundRect" }) };
@@ -746,6 +750,28 @@ export function setRadius(deck: Deck, slide: number, obj: number | null, pct: nu
     av.replaceChildren(gd);
   }, "radius");
 }
+/** Which ends of a line carry an arrowhead. */
+export function readArrows(node: Element): { head: boolean; tail: boolean } {
+  const ln = dig(node, "spPr", "ln");
+  const on = (n: string) => { const t = kid(ln, n)?.getAttribute("type"); return !!t && t !== "none"; };
+  return { head: on("headEnd"), tail: on("tailEnd") };
+}
+export function setArrows(deck: Deck, slide: number, obj: number | null, head: boolean, tail: boolean): boolean {
+  return editObj(deck, slide, obj, (node, doc) => {
+    const ln = dig(node, "spPr", "ln");
+    if (!ln) return false;
+    for (const n of ["headEnd", "tailEnd"]) kid(ln, n)?.remove();
+    const before = kid(ln, "extLst");
+    for (const [n, on] of [["headEnd", head], ["tailEnd", tail]] as const) {
+      if (!on) continue;
+      const e = doc.createElementNS(A_NS, `a:${n}`);
+      e.setAttribute("type", "triangle");
+      ln.insertBefore(e, before);
+    }
+  });
+}
+/** Is this a line (a connector, or a shape drawn as a line)? */
+export const isLine = (node: Element): boolean => node.localName === "cxnSp" || ["line", "straightConnector1"].includes(dig(node, "spPr", "prstGeom")?.getAttribute("prst") ?? "");
 export function readOutline(node: Element): { color: string | null; w: number } {
   const ln = dig(node, "spPr", "ln");
   return { color: ln ? dig(ln, "solidFill", "srgbClr")?.getAttribute("val") ?? null : null, w: num(ln?.getAttribute("w"), 12700) };

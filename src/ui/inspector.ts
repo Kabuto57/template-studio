@@ -1,7 +1,7 @@
 // The panel on the right: format whatever is selected on the slide.
 import { scanPlaceholders } from "../engine/engine";
 import { cfgKeyOf } from "../model/fields";
-import { readRadius, setRadius, readOpacity, readShadow, setOpacity, setShadow, alignObj, alignObjs, copyObjs, deleteObjs, distributeObjs, groupObjs, pasteObjs, ungroupObj, deleteObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, duplicateObj, inches, IN, readBox, readStyle, selTextNode, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder, type Align, type FieldPayload, type Sel, type ListKind, type TableOp, type TextStyle } from "../ooxml/edit";
+import { isLine, readArrows, setArrows, readRadius, setRadius, readOpacity, readShadow, setOpacity, setShadow, alignObj, alignObjs, copyObjs, deleteObjs, distributeObjs, groupObjs, pasteObjs, ungroupObj, deleteObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, duplicateObj, inches, IN, readBox, readStyle, selTextNode, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder, type Align, type FieldPayload, type Sel, type ListKind, type TableOp, type TextStyle } from "../ooxml/edit";
 import { SHAPES } from "../ooxml/shapes";
 import { collectEditables, collectObjects, paraText } from "../ooxml/render";
 import { A_NS, dig, esc, kid, kids, nodeXml, parseXml } from "../ooxml/xml";
@@ -170,10 +170,37 @@ function styleSection(node: Element, title: string): HTMLElement {
 
 const ROUND = [{ geom: "roundRect", label: "Rounded", icon: '<svg viewBox="-4 -4 108 108" aria-hidden="true"><rect width="100" height="100" rx="18" fill="currentColor"/></svg>' },
   { geom: "ellipse", label: "Circle", icon: '<svg viewBox="-4 -4 108 108" aria-hidden="true"><circle cx="50" cy="50" r="50" fill="currentColor"/></svg>' }];
+/** Colour, weight and arrowheads for lines and arrows. */
+function lineSection(node: Element): HTMLElement | null {
+  if (!isLine(node)) return null;
+  const sec = el("div", { class: "sect" });
+  sec.appendChild(el("div", { class: "sect-title" }, "Line"));
+  const out = readOutline(node);
+  sec.appendChild(colourControl("Colour", out.color, hex => { if (hex && setOutline(S.deck, S.cur, S.sel.obj, hex)) ui.refresh(); }));
+  const row = el("div", { class: "row", style: "margin-top:8px" });
+  const w = el("select", { class: "inp", "aria-label": "Line weight", style: "width:auto;flex:1" },
+    [[0.75, "Hairline"], [1.5, "Thin"], [2, "Regular"], [3, "Medium"], [6, "Thick"]].map(([v, n]) => `<option value="${v}">${n}</option>`).join(""));
+  const pt = out.w / 12700;
+  w.value = String([0.75, 1.5, 2, 3, 6].reduce((a, b) => Math.abs(b - pt) < Math.abs(a - pt) ? b : a));
+  w.addEventListener("change", () => { if (setOutline(S.deck, S.cur, S.sel.obj, out.color ?? "000000", +w.value)) ui.refresh(); });
+  const ar = readArrows(node);
+  const cur = ar.head && ar.tail ? "both" : ar.tail ? "end" : ar.head ? "start" : "none";
+  const ends = el("div", { class: "seg", role: "group", "aria-label": "Arrowheads" },
+    ([["none", "No arrowheads", "\u2014"], ["end", "Arrow at the end", "\u2192"], ["start", "Arrow at the start", "\u2190"], ["both", "Arrows at both ends", "\u2194"]] as const)
+      .map(([k, name, glyph]) => `<button type="button" data-e="${k}" aria-pressed="${cur === k}" aria-label="${name}" title="${name}">${glyph}</button>`).join(""));
+  ends.addEventListener("click", e => {
+    const k = (e.target as Element).closest<HTMLElement>("[data-e]")?.dataset.e;
+    if (k && setArrows(S.deck, S.cur, S.sel.obj, k === "start" || k === "both", k === "end" || k === "both")) ui.refresh();
+  });
+  row.append(w, ends);
+  sec.appendChild(row);
+  return sec;
+}
+
 /** Swap the shape's outline and set its border, like PowerPoint's Shape Format tab. */
 function shapeSection(node: Element): HTMLElement | null {
   const geom = readGeom(node);
-  if (geom === null || kid(kid(node, "nvSpPr"), "cNvSpPr")?.getAttribute("txBox") === "1") return null; // plain text boxes don't need it
+  if (geom === null || isLine(node) || kid(kid(node, "nvSpPr"), "cNvSpPr")?.getAttribute("txBox") === "1") return null; // plain text boxes don't need it
   const sec = el("div", { class: "sect" });
   sec.appendChild(el("div", { class: "sect-title" }, "Shape"));
   const grid = el("div", { class: "shape-grid small", role: "group", "aria-label": "Change shape" });
@@ -344,6 +371,7 @@ export function renderInspector(): void {
   if (textNode) host.appendChild(styleSection(textNode, cell ? "Cell style" : "Style"));
   else if (node.localName === "sp") host.appendChild(styleSection(node, "Style"));
   if (!cell) {
+    const ls = lineSection(node); if (ls) host.appendChild(ls);
     const sh = shapeSection(node); if (sh) host.appendChild(sh);
     const fx = effectsSection(node); if (fx) host.appendChild(fx);
   }

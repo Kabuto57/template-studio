@@ -6,6 +6,7 @@ import { shapeByGeom } from "./shapes";
 import { A_NS, R_NS, dig, kid, kids, num, parseXml } from "./xml";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
+let arrowSeq = 0;
 
 type ClrMap = Record<string, string>;
 type Layer = "slide" | "layout" | "master";
@@ -367,18 +368,41 @@ class Painter {
     const svgNS = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(svgNS, "svg");
     svg.classList.add("shp");
-    svg.setAttribute("preserveAspectRatio", "none");
     if (ctx.curObj !== undefined) svg.dataset.obj = String(ctx.curObj);
-    svg.setAttribute("viewBox", `0 0 ${Math.max(b.cx, 1)} ${Math.max(b.cy, 1)}`);
     svg.style.overflow = "visible";
     this.place(svg, { ...b, cx: Math.max(b.cx, 1), cy: Math.max(b.cy, 1) });
+    // a perfectly flat or upright line has a zero-size box, which browsers don't draw at all
+    svg.style.width = `max(1px, ${svg.style.width})`;
+    svg.style.height = `max(1px, ${svg.style.height})`;
     const line = document.createElementNS(svgNS, "line");
-    const [x1, x2] = b.flipH ? [b.cx, 0] : [0, b.cx], [y1, y2] = b.flipV ? [b.cy, 0] : [0, b.cy];
-    line.setAttribute("x1", String(x1)); line.setAttribute("y1", String(y1)); line.setAttribute("x2", String(x2)); line.setAttribute("y2", String(y2));
+    // percentages of the box, not a stretched viewBox, so arrowheads keep their shape
+    const [x1, x2] = b.flipH ? ["100%", "0%"] : ["0%", "100%"], [y1, y2] = b.flipV ? ["100%", "0%"] : ["0%", "100%"];
+    line.setAttribute("x1", x1); line.setAttribute("y1", y1); line.setAttribute("x2", x2); line.setAttribute("y2", y2);
     line.setAttribute("stroke", lineFill || "rgba(0,0,0,1)");
-    line.setAttribute("vector-effect", "non-scaling-stroke");
-    line.setAttribute("stroke-width", String(Math.max(1, w / 12700 * 1.33)));
+    const sw = Math.max(1, w / 12700 * 1.33);
+    line.setAttribute("stroke-width", String(sw));
+    // arrowheads: drawn in screen pixels so they keep their shape however the line is stretched
+    for (const end of ["headEnd", "tailEnd"] as const) {
+      const t = kid(ln, end)?.getAttribute("type");
+      if (!t || t === "none") continue;
+      const id = `ah${++arrowSeq}`;
+      const m = document.createElementNS(svgNS, "marker");
+      m.setAttribute("id", id); m.setAttribute("viewBox", "0 0 10 10"); m.setAttribute("refX", "8"); m.setAttribute("refY", "5");
+      m.setAttribute("markerWidth", "4"); m.setAttribute("markerHeight", "4"); m.setAttribute("orient", end === "tailEnd" ? "auto" : "auto-start-reverse");
+      m.setAttribute("markerUnits", "strokeWidth");
+      const pth = document.createElementNS(svgNS, "path");
+      pth.setAttribute("d", t === "oval" ? "M5 1a4 4 0 1 1 0 8a4 4 0 1 1 0-8z" : "M0 0 10 5 0 10z");
+      pth.setAttribute("fill", lineFill || "#000");
+      m.appendChild(pth);
+      svg.appendChild(m);
+      line.setAttribute(end === "tailEnd" ? "marker-end" : "marker-start", `url(#${id})`);
+    }
     svg.appendChild(line);
+    // a wide invisible stroke makes a thin line easy to click
+    const hit = line.cloneNode() as SVGLineElement;
+    for (const a of ["marker-start", "marker-end"]) hit.removeAttribute(a);
+    hit.setAttribute("stroke", "transparent"); hit.setAttribute("stroke-width", "14"); hit.style.pointerEvents = "stroke";
+    svg.appendChild(hit);
     out.appendChild(svg);
   }
 
