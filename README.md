@@ -14,7 +14,8 @@ computer.
 
 | | |
 |---|---|
-| **Design** | Start from six finished decks or a blank slide, or open your own PowerPoint. Drag in titles, text, bullet lists, number tiles and tables. Move, resize, restyle and reorder anything, including shapes from your own file. |
+| **Design** | Start from thirteen finished decks (seven plain red-and-black bank briefs first), a blank slide, or your own PowerPoint. Add slides from ten layouts. |
+| **Edit like PowerPoint** | A ribbon with text styles, number tiles, tables, 22 shapes, arrows, 38 icons and pictures (pasted screenshots too), plus a Format group. Type on the slide, select several items, group them, align and space them, snap to guides, use the Layers panel, right-click for more. Crop, flip, rotate, outline, transparency, shadows, numbered lists, table design. Change a template colour everywhere at once. Zoom, and present full screen. |
 | **Mark the fields** | Drag fields such as `{{report_title}}` or `{{findings.1.risk}}` onto text boxes and table cells. Tell the LLM what each one is for: a description, a word limit, examples, allowed values. |
 | **Test** | Paste the JSON an LLM returned and watch the slides fill. See what was left blank. Download the finished deck. |
 | **Get code** | Copy the prompt, the example JSON or JSON Schema, and the Python. Or download the whole kit as a zip. |
