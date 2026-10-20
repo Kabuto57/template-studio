@@ -21,9 +21,15 @@ async function open(page: Page): Promise<void> {
 }
 const fieldKeys = (page: Page) => page.locator("#mainSlide .ph").evaluateAll(els => els.map(e => e.getAttribute("title") ?? e.textContent));
 const slideCount = (page: Page) => page.locator("#film .thumb").count();
+/** Open a left panel. Clicking the tab that is already open folds the panel away, so only click when needed. */
+async function showPanel(page: Page, side: string): Promise<void> {
+  const tab = page.locator(`#rail [data-side=${side}]`);
+  if (await tab.getAttribute("aria-pressed") !== "true") await tab.click();
+  await expect(page.locator("#side")).toBeVisible();
+}
 async function startBlank(page: Page): Promise<void> {
   await open(page);
-  await page.click("#rail [data-side=templates]");
+  await showPanel(page, "templates");
   await page.click(".card.blank");
   await expect(page.locator("#mainSlide [data-obj]")).toHaveCount(0);
 }
@@ -81,7 +87,7 @@ test("build a template from blank, test it, get the code, and come back to it", 
   expect((await page.locator('#mainSlide [data-obj="0"]').boundingBox())!.x).toBeGreaterThan(resized.x);
 
   // new field -> drop on the text box, and on the number tile (its "Label" line must survive)
-  await page.click("#rail [data-side=fields]");
+  await showPanel(page, "fields");
   await page.fill("#newField", "summary");
   await page.keyboard.press("Enter");
   await page.dragAndDrop('.chip.pending:has-text("summary")', '#mainSlide [data-obj="1"]');
@@ -104,7 +110,7 @@ test("build a template from blank, test it, get the code, and come back to it", 
   await page.click('#insp button:has-text("Add row")');
   await page.click('#insp button:has-text("Add column")');
   expect(await fieldKeys(page)).toEqual(expect.arrayContaining(["{{rows.4.name}}", "{{rows.4.column}}"]));
-  await page.click("#rail [data-side=fields]");
+  await showPanel(page, "fields");
   await page.locator('.fgroup .chip:has-text("detail")').dragTo(page.locator("#mainSlide td.hit").nth(4));
   expect(await fieldKeys(page)).toContain("{{rows.1.detail}}");
   await page.locator('.fgroup .chip:has-text("Number of rows")').dragTo(page.locator('#mainSlide [data-obj="0"]'));
@@ -174,14 +180,14 @@ test("build a template from blank, test it, get the code, and come back to it", 
   await page.click(".steps [data-view=design]");
   expect(await slideCount(page)).toBe(2);
   expect(await fieldKeys(page)).toEqual(expect.arrayContaining(["{{summary}}", "{{revenue}}", "{{count:rows}}"]));
-  await page.click("#rail [data-side=templates]");
+  await showPanel(page, "templates");
   await expect(page.locator(".recent-row")).toHaveCount(1); // the audit sample we started from
   expect(errors).toEqual([]);
 });
 
 test("format a text box: text, style, colour, undo", async ({ page }) => {
   await startBlank(page);
-  await page.click("#rail [data-side=elements]");
+  await showPanel(page, "elements");
   await page.click(".block[data-type=label]");
   await expect(page.locator("#insp h2")).toHaveText("Text box");
   await page.fill("#inspText", "Quarterly update\nPrepared by {{author}}");
@@ -212,7 +218,7 @@ test("format a text box: text, style, colour, undo", async ({ page }) => {
 
 test("rename a field and it changes in the template and the outputs", async ({ page }) => {
   await open(page);
-  await page.click("#rail [data-side=fields]");
+  await showPanel(page, "fields");
   await page.click('.chip:has-text("entity_name")');
   await page.locator(".field-card .key").first().fill("company");
   await page.locator(".field-card .key").first().press("Enter");
@@ -305,7 +311,7 @@ test("private and offline: no requests after load, and it runs without a network
   const fromServer: string[] = [];
   page.on("response", r => { if (!/^(blob|data):/.test(r.url()) && !r.fromServiceWorker()) fromServer.push(r.url()); });
   await page.click("[data-design=boardroom]");
-  await page.click("#rail [data-side=elements]");
+  await showPanel(page, "elements");
   await page.click(".block[data-type=title]");
   await page.click(".steps [data-view=test]");
   await page.click(".steps [data-view=code]");
@@ -320,7 +326,7 @@ test("private and offline: no requests after load, and it runs without a network
   await expect(page.locator("#pyOut")).toContainText("def main");
   await page.click(".steps [data-view=design]");
   await expect(page.locator("#projName")).toHaveValue("Boardroom");
-  await page.click("#rail [data-side=templates]");
+  await showPanel(page, "templates");
   await page.click("[data-design=orchard]");
   await expect(page.locator("#projName")).toHaveValue("Orchard");
   const [kit] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Download pptx_kit.py" }).or(page.locator("#kitBtn")).first().click()]);
@@ -337,6 +343,10 @@ test("insert ribbon: shapes, a picture, copy and paste, and they reach the kit",
   await expect(page.locator("#insp h2")).toHaveText("Shape");
   await page.click("#insp [aria-label='Change to hexagon']");
   await expect(page.locator("#insp [aria-label='Change to hexagon']")).toHaveAttribute("aria-pressed", "true");
+  await page.click("#pop-icons");
+  await page.click(".ins-pop [data-icon=bank]");
+  await expect(page.locator("#mainSlide img")).toHaveCount(1);
+  await page.keyboard.press("Delete");
   await page.setInputFiles("#imageInput", "docs/img/fields.png");
   await expect(page.locator("#mainSlide img")).toHaveCount(1);
   await expect(page.locator("#insp h2")).toHaveText("Picture");
@@ -393,7 +403,7 @@ test("security: a strict content policy, hostile text stays text, and saved data
   // Markup typed as a template name, a field description and test data must never become elements.
   const evil = `"><img src=x onerror="window.__pwned=1"><script>window.__pwned=1</script>`;
   await page.fill("#projName", evil);
-  await page.click("#rail [data-side=fields]");
+  await showPanel(page, "fields");
   await page.locator(".chip").first().click();
   await page.locator('.field-card input[placeholder="What should go here?"]').first().fill(evil);
   await page.click(".steps [data-view=test]");
@@ -402,7 +412,7 @@ test("security: a strict content policy, hostile text stays text, and saved data
   await page.click(".steps [data-view=code]");
   await expect(page.locator("#pyOut")).toContainText("def main");
   await page.click(".steps [data-view=design]");
-  await page.click("#rail [data-side=templates]");
+  await showPanel(page, "templates");
   await page.waitForTimeout(700); // autosave, so the name also reaches the Recent list on reload
   await page.reload();
   await expect(page.locator("#projName")).toHaveValue(evil);
@@ -411,10 +421,18 @@ test("security: a strict content policy, hostile text stays text, and saved data
   expect(violations).toEqual([]); // the app itself never trips its own policy
 
   // Removing saved data brings back the sample and leaves nothing behind.
-  await page.click("#rail [data-side=settings]");
+  await showPanel(page, "settings");
   await page.click("#wipeBtn");
   await page.click("#wipeBtn");
   await expect(page.locator("#projName")).toHaveValue("Audit Report Highlights");
-  await page.click("#rail [data-side=templates]");
+  await showPanel(page, "templates");
   await expect(page.locator(".recent-row")).toHaveCount(0);
+});
+
+test("clicking the open panel's tab folds it away for more room", async ({ page }) => {
+  await open(page);
+  await page.click("#rail [data-side=templates]");
+  await expect(page.locator("#side")).toBeHidden();
+  await page.click("#rail [data-side=elements]");
+  await expect(page.locator("#side")).toBeVisible();
 });

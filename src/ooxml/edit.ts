@@ -474,7 +474,7 @@ export function duplicateObj(deck: Deck, slide: number, obj: number | null): num
 
 /* ---------------------------------------------------------------- pictures */
 /** Add a picture to a slide, fitted inside 6 x 4 in and centred. Returns the new object's index. */
-export function insertImage(deck: Deck, slide: number, data: Uint8Array, ext: "png" | "jpeg", w: number, h: number): number | null {
+export function insertImage(deck: Deck, slide: number, data: Uint8Array, ext: "png" | "jpeg", w: number, h: number, fit = { w: 6, h: 4 }, name = "Picture"): number | null {
   const info = deck.slides[slide];
   if (!info || !w || !h) return null;
   let n = 1;
@@ -483,7 +483,7 @@ export function insertImage(deck: Deck, slide: number, data: Uint8Array, ext: "p
   // ponytail: the image bytes sit outside undo; undoing leaves an unused image in the file, which PowerPoint ignores
   deck.zip.set(media, data);
   try { deck.media[media] = URL.createObjectURL(new Blob([data as BlobPart], { type: `image/${ext}` })); } catch { /* no preview; the file still has the picture */ }
-  const k = Math.min(6 * IN / w, 4 * IN / h);
+  const k = Math.min(fit.w * IN / w, fit.h * IN / h);
   const cx = snap(w * k), cy = snap(h * k);
   const box = { cx, cy, x: snap((deck.W - cx) / 2), y: snap((deck.H - cy) / 2) };
   let obj: number | null = null;
@@ -493,7 +493,7 @@ export function insertImage(deck: Deck, slide: number, data: Uint8Array, ext: "p
     const rid = addRel(deck, info.path, put, media);
     const doc = parseXml(deck.texts[info.path]!);
     const id = nextShapeId(doc);
-    dig(doc.documentElement, "cSld", "spTree")!.appendChild(importXml(doc, picXml(id, rid, box)));
+    dig(doc.documentElement, "cSld", "spTree")!.appendChild(importXml(doc, picXml(id, rid, box, name)));
     obj = collectObjects(doc).length - 1;
     put(info.path, serializeXml(doc));
   });
@@ -510,8 +510,8 @@ function addRel(deck: Deck, part: string, put: (p: string, x: string) => void, t
   put(path, xml.replace("</Relationships>", `<Relationship Id="rIdImg${i}" Type="${REL_IMAGE}" Target="${relTarget(part, target)}"/></Relationships>`));
   return `rIdImg${i}`;
 }
-const picXml = (id: number, rid: string, b: Rect): string =>
-  `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="Picture ${id}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>` +
+const picXml = (id: number, rid: string, b: Rect, name: string): string =>
+  `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="${attrEsc(name)} ${id}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>` +
   `<p:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>` +
   `<p:spPr><a:xfrm><a:off x="${b.x}" y="${b.y}"/><a:ext cx="${b.cx}" cy="${b.cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
 
@@ -707,6 +707,23 @@ export function setGeom(deck: Deck, slide: number, obj: number | null, geom: str
     pg.setAttribute("prst", geom);
     pg.replaceChildren(doc.createElementNS(A_NS, "a:avLst"));
   });
+}
+/** Corner roundness of a rounded rectangle, 0 to 50 (percent of the shorter side). */
+export const readRadius = (node: Element): number | null => {
+  const pg = dig(node, "spPr", "prstGeom");
+  if (pg?.getAttribute("prst") !== "roundRect") return null;
+  const f = kid(kid(pg, "avLst"), "gd")?.getAttribute("fmla");
+  return f ? Math.round(num(f.replace(/\D/g, "")) / 1000) : 17;
+};
+export function setRadius(deck: Deck, slide: number, obj: number | null, pct: number): boolean {
+  return editObj(deck, slide, obj, (node, doc) => {
+    const av = dig(node, "spPr", "prstGeom", "avLst");
+    if (!av) return false;
+    const gd = doc.createElementNS(A_NS, "a:gd");
+    gd.setAttribute("name", "adj");
+    gd.setAttribute("fmla", `val ${Math.round(Math.min(50, Math.max(0, pct)) * 1000)}`);
+    av.replaceChildren(gd);
+  }, "radius");
 }
 export function readOutline(node: Element): { color: string | null; w: number } {
   const ln = dig(node, "spPr", "ln");

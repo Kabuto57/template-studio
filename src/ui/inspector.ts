@@ -1,7 +1,7 @@
 // The panel on the right: format whatever is selected on the slide.
 import { scanPlaceholders } from "../engine/engine";
 import { cfgKeyOf } from "../model/fields";
-import { readOpacity, readShadow, setOpacity, setShadow, alignObj, alignObjs, copyObjs, deleteObjs, distributeObjs, groupObjs, pasteObjs, ungroupObj, deleteObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, duplicateObj, inches, IN, readBox, readStyle, selTextNode, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder, type Align, type FieldPayload, type Sel, type ListKind, type TableOp, type TextStyle } from "../ooxml/edit";
+import { readRadius, setRadius, readOpacity, readShadow, setOpacity, setShadow, alignObj, alignObjs, copyObjs, deleteObjs, distributeObjs, groupObjs, pasteObjs, ungroupObj, deleteObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, duplicateObj, inches, IN, readBox, readStyle, selTextNode, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder, type Align, type FieldPayload, type Sel, type ListKind, type TableOp, type TextStyle } from "../ooxml/edit";
 import { SHAPES } from "../ooxml/shapes";
 import { collectEditables, collectObjects, paraText } from "../ooxml/render";
 import { A_NS, dig, esc, kid, kids, nodeXml, parseXml } from "../ooxml/xml";
@@ -183,6 +183,14 @@ function shapeSection(node: Element): HTMLElement | null {
     grid.appendChild(b);
   }
   sec.appendChild(grid);
+  const rad = readRadius(node);
+  if (rad !== null) {
+    const row = el("div", { class: "row tight", style: "margin-bottom:10px" });
+    const range = el("input", { type: "range", min: "0", max: "50", step: "1", value: String(rad), "aria-label": "Corner roundness", style: "flex:1" });
+    range.addEventListener("change", () => { if (setRadius(S.deck, S.cur, S.sel.obj, +range.value)) ui.refresh(); });
+    row.appendChild(range);
+    sec.append(el("span", { class: "lbl" }, "Corners"), row);
+  }
   const out = readOutline(node);
   sec.appendChild(colourControl("Outline", out.color, hex => { if (setOutline(S.deck, S.cur, S.sel.obj, hex)) ui.refresh(); }, true));
   if (out.color) {

@@ -52,9 +52,14 @@ function setView(v: View): void {
   renderView();
 }
 
-function setSide(s: SideTab): void {
+function setSide(s: SideTab, fromRail = false): void {
+  const app = $("#app");
+  // clicking the open tab again folds the panel away for more room, like Canva
+  const fold = fromRail && s === S.side && !app.classList.contains("side-hidden");
+  app.classList.toggle("side-hidden", fold);
   S.side = s;
   renderSide();
+  if (fold) $$<HTMLElement>("#rail [data-side]").forEach(b => b.setAttribute("aria-pressed", "false"));
 }
 
 function select(sel: Sel, opts: { field?: string | null; multi?: number[] } = {}): void {
@@ -76,7 +81,7 @@ function undoRedo(which: "undo" | "redo"): void {
   toast(which === "undo" ? "Undone" : "Redone");
 }
 
-function openAbout(): void {
+function openAbout(keys = false): void {
   const d = $<HTMLDialogElement>("#aboutDialog");
   const fact = (title: string, text: string) => `<div class="fact">${ICON.check}<div><b>${title}</b><span>${text}</span></div></div>`;
   d.innerHTML = `<div class="dialog-body">
@@ -87,19 +92,26 @@ function openAbout(): void {
       ${fact("Works offline", "After the first visit the app runs without a connection. You can install it from your browser's menu.")}
       ${fact("Free and open source", "No paid tier. The generated Python uses only the standard library, so it runs in a Dify Code node as it is.")}
     </div>
+    <details class="keys"><summary>Keyboard shortcuts</summary><dl>
+      ${[["Ctrl+Z / Ctrl+Shift+Z", "Undo / redo"], ["Ctrl+C, X, V", "Copy, cut, paste (also screenshots)"], ["Ctrl+D", "Duplicate"], ["Ctrl+A", "Select everything on the slide"],
+        ["Shift+click, or drag a box", "Select several"], ["Ctrl+G / Ctrl+Shift+G", "Group / ungroup"], ["Ctrl+B, I, U", "Bold, italic, underline"],
+        ["Arrow keys (Shift for bigger steps)", "Nudge"], ["Alt while dragging", "Place without snapping"], ["Shift while resizing", "Keep proportions"],
+        ["Delete", "Remove"], ["Esc", "Deselect"], ["Right-click", "More actions"], ["?", "This list"]]
+        .map(([k, v]) => `<dt><kbd>${k}</kbd></dt><dd>${v}</dd>`).join("")}</dl></details>
     <footer><span>Version ${__APP_VERSION__} · <a href="${REPO_URL}" target="_blank" rel="noopener">Source on GitHub</a></span>
     <button class="btn primary" type="button" id="aboutClose">Close</button></footer></div>`;
   d.querySelector("#aboutClose")!.addEventListener("click", () => d.close());
+  if (keys) (d.querySelector("details.keys") as HTMLDetailsElement).open = true;
   d.showModal();
 }
 
 function wire(): void {
   wireStage(f => void openFile(f));
   $$("[data-view][role=tab]").forEach(b => b.addEventListener("click", () => setView(b.dataset.view as View)));
-  $$("#rail [data-side]").forEach(b => b.addEventListener("click", () => setSide(b.dataset.side as SideTab)));
+  $$("#rail [data-side]").forEach(b => b.addEventListener("click", () => setSide(b.dataset.side as SideTab, true)));
   $("#undoBtn").addEventListener("click", () => undoRedo("undo"));
   $("#redoBtn").addEventListener("click", () => undoRedo("redo"));
-  $("#aboutBtn").addEventListener("click", openAbout);
+  $("#aboutBtn").addEventListener("click", () => openAbout());
   $("#nextBtn").addEventListener("click", () => setView(S.view === "design" ? "test" : "code"));
   $("#kitBtn").addEventListener("click", () => void downloadKit());
   $("#openBtn").addEventListener("click", () => $("#fileInput").click());
@@ -124,6 +136,7 @@ function wire(): void {
     const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
     if (mod && key === "z" && !typing) { e.preventDefault(); undoRedo(e.shiftKey ? "redo" : "undo"); return; }
     if (mod && key === "y" && !typing) { e.preventDefault(); undoRedo("redo"); return; }
+    if (!typing && e.key === "?") { e.preventDefault(); openAbout(true); return; }
     if (!typing && S.view === "design" && mod && key === "a") {
       e.preventDefault();
       const n = S.deck.slides[S.cur] ? collectObjects(parseXml(S.deck.texts[S.deck.slides[S.cur]!.path]!)).length : 0;

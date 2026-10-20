@@ -6,8 +6,9 @@ import { fillXml, newReport, type Data } from "../engine/engine";
 import type { Project } from "../model/fields";
 import { fieldType } from "../model/fields";
 import { Deck } from "../ooxml/deck";
-import { SHAPE_BLOCKS, blockDef, type BlockDef, type BlockType } from "../ooxml/edit";
+import { SHAPE_BLOCKS, lookOf, blockDef, type BlockDef, type BlockType } from "../ooxml/edit";
 import { shapeByGeom } from "../ooxml/shapes";
+import { ICONS, iconSvg } from "../ooxml/icons";
 import { renderSlide } from "../ooxml/render";
 import { esc } from "../ooxml/xml";
 import { forgetRecent, listRecent } from "../persist/db";
@@ -16,7 +17,7 @@ import { BRIEFS, MORE } from "../templates/designs";
 import { $, ICON, el, toast } from "./dom";
 import { fieldsPanel } from "./fields";
 import { openBlank, openDesign, openSample, openSaved, wipeAll } from "./project";
-import { doInsertBlock, makeDraggable } from "./stage";
+import { doInsertBlock, doInsertIcon, makeDraggable } from "./stage";
 import { S, ui } from "./state";
 
 /* ---------------------------------------------------------------- designs */
@@ -146,6 +147,36 @@ const defs = (types: BlockType[]): BlockDef[] => types.map(t => blockDef(t)!);
 const TEXT: BlockType[] = ["title", "subtitle", "text", "bullets", "quote", "callout", "label", "tag"];
 const BASIC_SHAPES: BlockType[] = ["box", "frame", "circle", "line"];
 
+/** Colour swatches plus a grid of icons; clicking one adds it in the chosen colour. */
+let iconColour = "";
+function iconPicker(): HTMLElement {
+  const wrap = el("div");
+  const look = lookOf(S.deck);
+  const colours = [...new Set([look.accent, look.ink, look.muted, "FFFFFF"])];
+  if (!colours.includes(iconColour)) iconColour = colours[0]!;
+  const row = el("div", { class: "colour", role: "group", "aria-label": "Icon colour", style: "margin-bottom:10px" });
+  const grid = el("div", { class: "shape-grid icons" });
+  const paint = () => grid.querySelectorAll<HTMLElement>(".shape-btn").forEach(b => { b.style.color = `#${iconColour}`; b.style.background = iconColour === "FFFFFF" ? "#41465C" : ""; });
+  for (const c of colours) {
+    const b = el("button", { class: "sw", type: "button", style: `background:#${c}`, title: `#${c}`, "aria-label": `Icon colour #${c}`, "aria-pressed": String(c === iconColour) });
+    b.addEventListener("click", ev => {
+      ev.stopPropagation(); // choosing a colour keeps the menu open
+      iconColour = c;
+      row.querySelectorAll(".sw").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+      paint();
+    });
+    row.appendChild(b);
+  }
+  for (const ic of ICONS) {
+    const b = el("button", { class: "shape-btn", type: "button", title: ic.label, "aria-label": `Add ${ic.label.toLowerCase()} icon`, "data-icon": ic.id }, iconSvg(ic));
+    b.addEventListener("click", () => void doInsertIcon(ic, iconColour));
+    grid.appendChild(b);
+  }
+  paint();
+  wrap.append(row, grid);
+  return wrap;
+}
+
 function elementsPanel(): HTMLElement {
   const wrap = el("div");
   wrap.appendChild(el("div", { class: "panel-head" }, "<h2>Elements</h2><p>Drag onto the slide, or click to add in the middle. Yellow parts are fields the LLM fills.</p>"));
@@ -160,6 +191,7 @@ function elementsPanel(): HTMLElement {
   pic.addEventListener("click", pickImage);
   section("Data and pictures", grid([...defs(["number", "table"]).map(b => blockCard(b)), pic]));
   section("Shapes", grid([...defs(BASIC_SHAPES), ...SHAPE_BLOCKS].map(b => blockCard(b, true)), "shape-grid"));
+  section("Icons", iconPicker());
   return wrap;
 }
 
@@ -192,7 +224,8 @@ export function renderInsertBar(): void {
     b.addEventListener("click", onClick);
     return b;
   };
-  const blockBtn = (t: BlockType) => { const d = blockDef(t)!; return btn(d.label, artOf(t), `${d.label}: ${d.hint}`, () => doInsertBlock(t), t); };
+  const SHORT: Partial<Record<BlockType, string>> = { number: "Number", bullets: "Bullets" };
+  const blockBtn = (t: BlockType) => { const d = blockDef(t)!; return btn(SHORT[t] ?? d.label, artOf(t), `${d.label}: ${d.hint}`, () => doInsertBlock(t), t); };
   const group = (name: string, ...items: HTMLElement[]) => {
     const g = el("div", { class: "ins-group", role: "group", "aria-label": name });
     const row = el("div", { class: "ins-row" });
@@ -206,7 +239,11 @@ export function renderInsertBar(): void {
     pop.appendChild(g);
   }), undefined, true);
   group("Text", ...(["title", "subtitle", "text", "bullets"] as BlockType[]).map(blockBtn), moreText);
-  group("Insert", blockBtn("number"), blockBtn("table"), btn("Picture", `<svg viewBox="0 0 120 62" aria-hidden="true">${PICTURE_ART}</svg>`, "Picture: a logo or photo from your computer", pickImage));
+  const icons: HTMLElement = btn("Icons", `<svg viewBox="-12 -1 48 26" aria-hidden="true" style="color:#41465C">${ICONS[0]!.svg.replace(/<path/g, '<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"')}</svg>`, "Icons", () => popover(icons, pop => {
+    pop.appendChild(el("div", { class: "sect-title" }, "Icons"));
+    pop.appendChild(iconPicker());
+  }), undefined, true);
+  group("Insert", blockBtn("number"), blockBtn("table"), icons, btn("Picture", `<svg viewBox="0 0 120 62" aria-hidden="true">${PICTURE_ART}</svg>`, "Picture: a logo or photo from your computer", pickImage));
   const shapes: HTMLElement = btn("Shapes", artOf("shape:star5"), "Shapes", () => popover(shapes, pop => {
     pop.appendChild(el("div", { class: "sect-title" }, "Shapes"));
     const g = el("div", { class: "shape-grid" });

@@ -6,6 +6,7 @@ import { collectObjects, fitPlaceholderBoxes, renderSlide } from "../ooxml/rende
 import { esc, parseXml } from "../ooxml/xml";
 import { $, ICON, el, toast } from "./dom";
 import { openContextMenu } from "./inspector";
+import { iconSvg, type IconDef } from "../ooxml/icons";
 import { popover } from "./side";
 import { S, clearSel, selected, setSel, ui } from "./state";
 
@@ -408,6 +409,27 @@ export async function doInsertImage(file: File): Promise<void> {
   S.selField = null;
   ui.refresh();
   toast(`Added picture (${Math.round(data.length / 1024)} KB)`);
+}
+
+/** Draw a line icon in a colour as a 512 px PNG and add it, about 1.2 in square. */
+export async function doInsertIcon(icon: IconDef, colour: string): Promise<void> {
+  const url = URL.createObjectURL(new Blob([iconSvg(icon, colour, 512)], { type: "image/svg+xml" }));
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const c = document.createElement("canvas");
+    c.width = c.height = 512;
+    c.getContext("2d")!.drawImage(img, 0, 0, 512, 512);
+    const blob = await new Promise<Blob | null>(r => c.toBlob(r, "image/png"));
+    if (!blob) return;
+    const obj = insertImage(S.deck, S.cur, new Uint8Array(await blob.arrayBuffer()), "png", 512, 512, { w: 1.2, h: 1.2 }, `Icon ${icon.label}`);
+    if (obj === null) return;
+    setSel(obj);
+    ui.refresh();
+    toast(`Added ${icon.label.toLowerCase()} icon`);
+  } catch { toast("Couldn't draw that icon."); }
+  finally { URL.revokeObjectURL(url); }
 }
 
 let clip: Clip | null = null;
