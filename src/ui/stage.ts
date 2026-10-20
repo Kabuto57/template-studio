@@ -455,9 +455,9 @@ export function doInsertBlock(type: BlockType, centre?: { x: number; y: number }
  * Add a picture. Big images are scaled to 1600 px and re-encoded, because the template, pictures
  * included, is built into the generated Python and has to stay small enough for Dify.
  */
-export async function doInsertImage(file: File): Promise<void> {
+export async function prepareImage(file: File): Promise<{ data: Uint8Array; ext: "png" | "jpeg"; w: number; h: number } | null> {
   let bmp: ImageBitmap;
-  try { bmp = await createImageBitmap(file); } catch { toast("That file isn't a picture this browser can read."); return; }
+  try { bmp = await createImageBitmap(file); } catch { toast("That file isn't a picture this browser can read."); return null; }
   const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
   const keep = (file.type === "image/png" || file.type === "image/jpeg") && k === 1 && file.size <= 200_000;
   let data: Uint8Array, ext: "png" | "jpeg" = file.type === "image/jpeg" ? "jpeg" : "png";
@@ -470,16 +470,23 @@ export async function doInsertImage(file: File): Promise<void> {
     // a picture with no see-through pixels is much smaller as a JPEG
     if (ext === "png" && !g.getImageData(0, 0, c.width, c.height).data.some((v, i) => i % 4 === 3 && v < 255)) ext = "jpeg";
     const blob = await new Promise<Blob | null>(r => c.toBlob(r, `image/${ext}`, 0.85));
-    if (!blob) { toast("Couldn't prepare that picture."); return; }
+    if (!blob) { toast("Couldn't prepare that picture."); return null; }
     data = new Uint8Array(await blob.arrayBuffer());
   }
-  const obj = insertImage(S.deck, S.cur, data, ext, bmp.width, bmp.height);
+  const out = { data, ext, w: bmp.width, h: bmp.height };
   bmp.close();
+  return out;
+}
+
+export async function doInsertImage(file: File): Promise<void> {
+  const img = await prepareImage(file);
+  if (!img) return;
+  const obj = insertImage(S.deck, S.cur, img.data, img.ext, img.w, img.h);
   if (obj === null) return;
   setSel(obj);
   S.selField = null;
   ui.refresh();
-  toast(`Added picture (${Math.round(data.length / 1024)} KB)`);
+  toast(`Added picture (${Math.round(img.data.length / 1024)} KB)`);
 }
 
 /** Draw a line icon in a colour as a 512 px PNG and add it, about 1.2 in square. */

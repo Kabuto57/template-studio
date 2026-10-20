@@ -442,6 +442,8 @@ class Painter {
       const poly = document.createElementNS(SVG_NS, "polygon");
       poly.setAttribute("points", shape.poly);
       poly.setAttribute("vector-effect", "non-scaling-stroke");
+      const fx = xfrmOf(spPr);
+      if (fx?.flipH || fx?.flipV) svg.style.transform = `scale(${fx.flipH ? -1 : 1}, ${fx.flipV ? -1 : 1})`;
       poly.style.fill = fill || "none";
       if (lnCol) { poly.style.stroke = lnCol; poly.style.strokeWidth = lnW; }
       svg.appendChild(poly);
@@ -490,6 +492,7 @@ class Painter {
     if (ctx.curObj !== undefined) img.dataset.obj = String(ctx.curObj);
     img.src = url;
     img.style.objectFit = "fill";
+    if (b0.flipH || b0.flipV) img.style.scale = `${b0.flipH ? -1 : 1} ${b0.flipV ? -1 : 1}`;
     const amt = el.getElementsByTagNameNS(A_NS, "alphaModFix")[0]?.getAttribute("amt");
     if (amt) img.style.opacity = String(num(amt) / 100000);
     this.shadow(img, kid(el, "spPr"), ctx);

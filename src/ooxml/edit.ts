@@ -663,6 +663,90 @@ export function ungroupObj(deck: Deck, slide: number, obj: number | null): numbe
 }
 const OBJ_TYPES_EDIT = new Set(["sp", "pic", "graphicFrame", "grpSp", "cxnSp"]);
 
+/* ---------------------------------------------------------------- flip, replace picture, alt text */
+export function readFlip(node: Element): { h: boolean; v: boolean } | null {
+  const x = dig(node, "spPr", "xfrm");
+  return x ? { h: x.getAttribute("flipH") === "1", v: x.getAttribute("flipV") === "1" } : null;
+}
+export function toggleFlip(deck: Deck, slide: number, obj: number | null, axis: "h" | "v"): boolean {
+  return editObj(deck, slide, obj, node => {
+    const x = dig(node, "spPr", "xfrm");
+    if (!x) return false;
+    const a = axis === "h" ? "flipH" : "flipV";
+    if (x.getAttribute(a) === "1") x.removeAttribute(a); else x.setAttribute(a, "1");
+  });
+}
+/** Swap a picture's image, keeping its width and position (the height follows the new image). */
+export function replacePicture(deck: Deck, slide: number, obj: number | null, data: Uint8Array, ext: "png" | "jpeg", w: number, h: number): boolean {
+  const info = deck.slides[slide];
+  if (!info || obj === null || !w || !h) return false;
+  let n = 1;
+  while (deck.zip.has(`ppt/media/image${n}.png`) || deck.zip.has(`ppt/media/image${n}.jpeg`)) n++;
+  const media = `ppt/media/image${n}.${ext}`;
+  deck.zip.set(media, data);
+  try { deck.media[media] = URL.createObjectURL(new Blob([data as BlobPart], { type: `image/${ext}` })); } catch { /* no preview */ }
+  return deck.transaction(put => {
+    const ct = deck.texts["[Content_Types].xml"]!;
+    if (!new RegExp(`Extension="${ext}"`, "i").test(ct)) put("[Content_Types].xml", ct.replace(/(<Types[^>]*>)/, `$1<Default Extension="${ext}" ContentType="image/${ext}"/>`));
+    const doc = parseXml(deck.texts[info.path]!);
+    const node = collectObjects(doc)[obj];
+    const blip = node?.localName === "pic" ? dig(node, "blipFill", "blip") : null;
+    if (!node || !blip) return;
+    blip.setAttributeNS(R_NS, "r:embed", addRel(deck, info.path, put, media));
+    const b = readBox(deck, node, info);
+    if (b) writeBox(node, { ...b, cy: Math.round(b.cx * h / w) }, b);
+    put(info.path, serializeXml(doc));
+  });
+}
+const cNvPrOf = (node: Element): Element | null => [...node.getElementsByTagName("*")].find(e => e.localName === "cNvPr") ?? null;
+export const readAltText = (node: Element): string => cNvPrOf(node)?.getAttribute("descr") ?? "";
+/** The description a screen reader announces for a picture or shape. */
+export function setAltText(deck: Deck, slide: number, obj: number | null, text: string): boolean {
+  return editObj(deck, slide, obj, node => {
+    const c = cNvPrOf(node);
+    if (!c) return false;
+    if (text.trim()) c.setAttribute("descr", text.trim()); else c.removeAttribute("descr");
+  }, "alt");
+}
+
+/* ---------------------------------------------------------------- table design */
+export interface TableLook { head: string | null; band: boolean; borders: boolean }
+const cellFill = (tc: Element): string | null => dig(tc, "tcPr", "solidFill", "srgbClr")?.getAttribute("val") ?? null;
+export function readTableLook(node: Element): TableLook | null {
+  const tbl = node.getElementsByTagNameNS(A_NS, "tbl")[0];
+  if (!tbl) return null;
+  const rows = kids(tbl, "tr");
+  const first = kid(rows[0] ?? null, "tc");
+  const b1 = kid(rows[1] ?? null, "tc"), b2 = kid(rows[2] ?? null, "tc");
+  return {
+    head: first ? cellFill(first) : null,
+    band: !!b1 && !!b2 && cellFill(b1) !== cellFill(b2),
+    borders: !!(b1 ?? first) && !!dig(b1 ?? first, "tcPr", "lnB", "solidFill"), // body rows: headers often have none
+  };
+}
+/** Header colour, banded rows and borders for a whole table, like PowerPoint's Table Design tab. */
+export function setTableLook(deck: Deck, slide: number, obj: number | null, look: Partial<TableLook>): boolean {
+  const lk = lookOf(deck);
+  return editObj(deck, slide, obj, (node, doc) => {
+    const tbl = node.getElementsByTagNameNS(A_NS, "tbl")[0];
+    if (!tbl) return false;
+    const tcPrOf = (tc: Element) => { let p = kid(tc, "tcPr"); if (!p) { p = doc.createElementNS(A_NS, "a:tcPr"); tc.appendChild(p); } return p; };
+    kids(tbl, "tr").forEach((tr, r) => kids(tr, "tc").forEach(tc => {
+      const p = tcPrOf(tc);
+      if (r === 0 && look.head !== undefined) setSolid(p, look.head, ["headers", "extLst"]);
+      if (r > 0 && look.band !== undefined) setSolid(p, look.band && r % 2 === 0 ? lk.panel : null, ["headers", "extLst"]);
+      if (look.borders !== undefined) {
+        for (const n of ["lnL", "lnR", "lnT", "lnB"]) kid(p, n)?.remove();
+        const first = p.firstElementChild;
+        for (const n of ["lnL", "lnR", "lnT", "lnB"]) {
+          const ln = importXml(doc, look.borders ? `<a:${n} w="9525"><a:solidFill><a:srgbClr val="D9DCE1"/></a:solidFill></a:${n}>` : `<a:${n} w="0"><a:noFill/></a:${n}>`);
+          p.insertBefore(ln, first);
+        }
+      }
+    }));
+  });
+}
+
 /* ---------------------------------------------------------------- template colours */
 /** Every colour the slides use, most used first. */
 export function deckColours(deck: Deck): string[] {

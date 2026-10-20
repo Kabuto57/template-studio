@@ -1,13 +1,13 @@
 // The panel on the right: format whatever is selected on the slide.
 import { scanPlaceholders } from "../engine/engine";
 import { cfgKeyOf } from "../model/fields";
-import { isLine, readArrows, setArrows, readRadius, setRadius, readOpacity, readShadow, setOpacity, setShadow, alignObj, alignObjs, copyObjs, deleteObjs, distributeObjs, groupObjs, pasteObjs, ungroupObj, deleteObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, duplicateObj, inches, IN, readBox, readStyle, selTextNode, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder, type Align, type FieldPayload, type Sel, type ListKind, type TableOp, type TextStyle } from "../ooxml/edit";
+import { readFlip, toggleFlip, replacePicture, readAltText, setAltText, readTableLook, setTableLook, isLine, readArrows, setArrows, readRadius, setRadius, readOpacity, readShadow, setOpacity, setShadow, alignObj, alignObjs, copyObjs, deleteObjs, distributeObjs, groupObjs, pasteObjs, ungroupObj, deleteObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, duplicateObj, inches, IN, readBox, readStyle, selTextNode, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder, type Align, type FieldPayload, type Sel, type ListKind, type TableOp, type TextStyle } from "../ooxml/edit";
 import { SHAPES } from "../ooxml/shapes";
 import { collectEditables, collectObjects, paraText } from "../ooxml/render";
 import { A_NS, dig, esc, kid, kids, nodeXml, parseXml } from "../ooxml/xml";
 import { $, ICON, debounce, el, toast } from "./dom";
 import { fieldEditor } from "./fields";
-import { doPlaceField } from "./stage";
+import { doPlaceField, prepareImage } from "./stage";
 import { S, clearSel, selected, setSel, ui } from "./state";
 
 const FONTS = ["Arial", "Arial Black", "Calibri", "Cambria", "Century Gothic", "Courier New", "Georgia", "Segoe UI", "Tahoma", "Times New Roman", "Trebuchet MS", "Verdana"];
@@ -170,6 +170,46 @@ function styleSection(node: Element, title: string): HTMLElement {
 
 const ROUND = [{ geom: "roundRect", label: "Rounded", icon: '<svg viewBox="-4 -4 108 108" aria-hidden="true"><rect width="100" height="100" rx="18" fill="currentColor"/></svg>' },
   { geom: "ellipse", label: "Circle", icon: '<svg viewBox="-4 -4 108 108" aria-hidden="true"><circle cx="50" cy="50" r="50" fill="currentColor"/></svg>' }];
+/** Replace the image and describe it for screen readers. */
+function pictureSection(node: Element): HTMLElement | null {
+  if (node.localName !== "pic") return null;
+  const sec = el("div", { class: "sect" });
+  sec.appendChild(el("div", { class: "sect-title" }, "Picture"));
+  const rep = el("button", { class: "btn small", type: "button", style: "width:100%" }, "Replace picture\u2026");
+  const file = el("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp", hidden: true });
+  rep.addEventListener("click", () => file.click());
+  const obj = S.sel.obj, slide = S.cur;
+  file.addEventListener("change", async () => {
+    const f = file.files?.[0];
+    const img = f ? await prepareImage(f) : null;
+    if (img && replacePicture(S.deck, slide, obj, img.data, img.ext, img.w, img.h)) { ui.refresh(); toast("Picture replaced"); }
+  });
+  const alt = el("textarea", { class: "inp", rows: "2", id: "altText", placeholder: "e.g. Bank logo", spellcheck: "true" });
+  alt.value = readAltText(node);
+  alt.addEventListener("change", () => { if (setAltText(S.deck, S.cur, S.sel.obj, alt.value)) ui.save(); });
+  sec.append(rep, file, el("label", { class: "lbl", for: "altText", style: "margin-top:10px" }, "Alt text"), alt,
+    el("span", { class: "hint" }, "What a screen reader says for this picture. Leave empty if it is only decoration."));
+  return sec;
+}
+
+/** Header colour, banded rows and borders, like PowerPoint's Table Design tab. */
+function tableDesignSection(node: Element): HTMLElement | null {
+  const look = readTableLook(node);
+  if (!look) return null;
+  const sec = el("div", { class: "sect" });
+  sec.appendChild(el("div", { class: "sect-title" }, "Table design"));
+  const apply = (l: Partial<typeof look>) => { if (setTableLook(S.deck, S.cur, S.sel.obj, l)) ui.refresh(); };
+  sec.appendChild(colourControl("Header row", look.head, hex => apply({ head: hex }), true));
+  for (const [k, label] of [["band", "Banded rows"], ["borders", "Cell borders"]] as const) {
+    const lab = el("label", { class: "check" });
+    const box = el("input", { type: "checkbox", checked: look[k] });
+    box.addEventListener("change", () => apply({ [k]: box.checked }));
+    lab.append(box, document.createTextNode(` ${label}`));
+    sec.appendChild(lab);
+  }
+  return sec;
+}
+
 /** Colour, weight and arrowheads for lines and arrows. */
 function lineSection(node: Element): HTMLElement | null {
   if (!isLine(node)) return null;
@@ -290,6 +330,13 @@ function arrangeSection(node: Element): HTMLElement | null {
     const turn = el("button", { class: "btn small", type: "button" }, "Rotate 90\u00B0");
     turn.addEventListener("click", () => { if (setRotation(S.deck, S.cur, S.sel.obj, rot + 90)) ui.refresh(); });
     r.append(i, turn);
+    const fl = readFlip(node);
+    if (fl) {
+      const flips = el("div", { class: "seg", role: "group", "aria-label": "Flip" },
+        `<button type="button" data-f="h" aria-pressed="${fl.h}" aria-label="Flip horizontally" title="Flip horizontally">\u21C4</button><button type="button" data-f="v" aria-pressed="${fl.v}" aria-label="Flip vertically" title="Flip vertically">\u21C5</button>`);
+      flips.addEventListener("click", e => { const f = (e.target as Element).closest<HTMLElement>("[data-f]")?.dataset.f; if (f && toggleFlip(S.deck, S.cur, S.sel.obj, f as "h" | "v")) ui.refresh(); });
+      r.appendChild(flips);
+    }
     sec.append(el("label", { class: "lbl", for: "pos-rot" }, "Rotation (degrees)"), r);
   }
   return sec;
@@ -370,7 +417,9 @@ export function renderInspector(): void {
   if (fs) host.appendChild(fs);
   if (textNode) host.appendChild(styleSection(textNode, cell ? "Cell style" : "Style"));
   else if (node.localName === "sp") host.appendChild(styleSection(node, "Style"));
+  const td = tableDesignSection(node); if (td) host.appendChild(td);
   if (!cell) {
+    const pc = pictureSection(node); if (pc) host.appendChild(pc);
     const ls = lineSection(node); if (ls) host.appendChild(ls);
     const sh = shapeSection(node); if (sh) host.appendChild(sh);
     const fx = effectsSection(node); if (fx) host.appendChild(fx);
