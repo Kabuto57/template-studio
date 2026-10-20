@@ -70,6 +70,7 @@ function select(sel: Sel, opts: { field?: string | null; multi?: number[] } = {}
     if (opts.field) S.side = "fields";
     renderSide();
   }
+  if (S.side === "layers" && opts.field === undefined) renderSide(); // keep the highlighted layer in step
   drawOverlay();
   renderInspector();
 }

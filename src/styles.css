@@ -425,3 +425,9 @@ table.io th { font-weight: 600; color: var(--muted); font-size: var(--fs-xs); }
 .ins-group.fmt .fmt-size { width: 56px; height: 30px; padding: 0 6px; }
 .ins-group.fmt .fmt-colour { width: 30px; height: 30px; padding: 0; border: 1px solid var(--line-2); border-radius: 6px; background: none; cursor: pointer; }
 .ins-group.fmt.off .ins-row { opacity: .45; }
+.layers { display: flex; flex-direction: column; gap: 4px; }
+.layer { display: flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 8px; padding: 2px 4px 2px 2px; background: var(--panel); }
+.layer[aria-current="true"] { border-color: var(--primary); background: var(--primary-soft); }
+.layer-pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 0; background: none; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.layer-pick .kind { flex: none; width: 52px; font-size: var(--fs-xs); color: var(--muted); }
+.layer-pick .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }

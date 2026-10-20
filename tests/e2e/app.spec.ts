@@ -480,3 +480,18 @@ test("drag a slide in the filmstrip to reorder", async ({ page }) => {
   await page.locator("#film .thumb").nth(0).click();
   await expect(page.locator("#mainSlide")).toContainText("EXECUTIVE BRIEF");
 });
+
+test("layers panel lists the slide's items and moves them forward and back", async ({ page }) => {
+  await open(page);
+  await page.click("[data-design=brief]");
+  await showPanel(page, "layers");
+  const rows = page.locator(".layer");
+  const n = await rows.count();
+  expect(n).toBeGreaterThan(3);
+  await rows.nth(n - 1).locator(".layer-pick").click(); // the backmost item
+  await expect(rows.nth(n - 1)).toHaveAttribute("aria-current", "true");
+  const name = await rows.nth(n - 1).locator(".nm").textContent();
+  await rows.nth(n - 1).getByRole("button", { name: /^Bring forward/ }).click();
+  await expect(rows.nth(n - 2).locator(".nm")).toHaveText(name!);
+  await expect(rows.nth(n - 2)).toHaveAttribute("aria-current", "true");
+});

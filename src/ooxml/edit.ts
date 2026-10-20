@@ -897,6 +897,18 @@ export function zOrder(deck: Deck, slide: number, obj: number | null, where: "fr
   return ok ? idx : null;
 }
 
+/** Move an object one step forward (+1) or backward (-1) among the slide's objects. Returns its new index. */
+export function zStep(deck: Deck, slide: number, obj: number | null, dir: 1 | -1): number | null {
+  let idx: number | null = null;
+  const ok = editObj(deck, slide, obj, (node, doc) => {
+    const all = collectObjects(doc), i = all.indexOf(node), other = all[i + dir];
+    if (!other) return false;
+    if (dir > 0) other.after(node); else other.before(node);
+    idx = i + dir;
+  });
+  return ok ? idx : null;
+}
+
 export function setBox(deck: Deck, slide: number, obj: number | null, change: (cur: Rect) => Rect, mergeKey?: string): boolean {
   return editObj(deck, slide, obj, node => {
     const cur = readBox(deck, node, deck.slides[slide]!);

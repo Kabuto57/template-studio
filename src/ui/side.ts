@@ -6,11 +6,11 @@ import { fillXml, newReport, type Data } from "../engine/engine";
 import type { Project } from "../model/fields";
 import { fieldType } from "../model/fields";
 import { Deck } from "../ooxml/deck";
-import { SHAPE_BLOCKS, deckColours, replaceColour, lookOf, blockDef, type BlockDef, type BlockType } from "../ooxml/edit";
+import { SHAPE_BLOCKS, zStep, deckColours, replaceColour, lookOf, blockDef, type BlockDef, type BlockType } from "../ooxml/edit";
 import { shapeByGeom } from "../ooxml/shapes";
 import { ICONS, iconSvg } from "../ooxml/icons";
-import { renderSlide } from "../ooxml/render";
-import { esc } from "../ooxml/xml";
+import { collectObjects, renderSlide } from "../ooxml/render";
+import { A_NS, esc, parseXml } from "../ooxml/xml";
 import { forgetRecent, listRecent } from "../persist/db";
 import { buildDeck, type Design } from "../templates/builder";
 import { BRIEFS, MORE } from "../templates/designs";
@@ -18,7 +18,7 @@ import { $, ICON, el, toast } from "./dom";
 import { fieldsPanel } from "./fields";
 import { openBlank, openDesign, openSample, openSaved, wipeAll } from "./project";
 import { doInsertBlock, doInsertIcon, makeDraggable } from "./stage";
-import { S, ui } from "./state";
+import { S, selected, setSel, ui } from "./state";
 
 /* ---------------------------------------------------------------- designs */
 type Rules = Project["settings"]["colour_rules"];
@@ -260,6 +260,45 @@ export function renderInsertBar(): void {
   document.addEventListener("dragstart", closePop);
 }
 
+/* ---------------------------------------------------------------- layers */
+/** Everything on the slide, front first, like Canva's Position panel. Click to select; arrows move it. */
+function layersPanel(): HTMLElement {
+  const wrap = el("div");
+  wrap.appendChild(el("div", { class: "panel-head" }, "<h2>Layers</h2><p>Everything on this slide, front first. Click one to select it, even when it is hidden behind others.</p>"));
+  const info = S.deck.slides[S.cur];
+  const objs = info ? collectObjects(parseXml(S.deck.texts[info.path]!)) : [];
+  const list = el("div", { class: "layers", role: "list" });
+  const label = (n: Element): [string, string] => {
+    const text = [...n.getElementsByTagNameNS(A_NS, "t")].map(t => t.textContent).join(" ").trim();
+    const kind = n.localName === "pic" ? "Picture" : n.localName === "grpSp" ? "Group" : n.localName === "cxnSp" ? "Line"
+      : n.getElementsByTagNameNS(A_NS, "tbl")[0] ? "Table" : text ? "Text" : "Shape";
+    return [kind, text ? text.slice(0, 40) : [...n.getElementsByTagName("*")].find(e => e.localName === "cNvPr")?.getAttribute("name") ?? kind];
+  };
+  for (let i = objs.length - 1; i >= 0; i--) {
+    const [kind, name] = label(objs[i]!);
+    const on = S.sel.obj === i || S.multi.includes(i);
+    const row = el("div", { class: "layer", role: "listitem", "aria-current": String(on) });
+    const pick = el("button", { type: "button", class: "layer-pick" }, `<span class="kind">${kind}</span><span class="nm">${esc(name)}</span>`);
+    pick.addEventListener("click", e => {
+      if (e.shiftKey) { const cur = selected(); const next = cur.includes(i) ? cur.filter(x => x !== i) : [...cur, i]; ui.select({ obj: next[0] ?? null, cell: null }, { multi: next.slice(1) }); }
+      else ui.select({ obj: i, cell: null });
+      ui.renderSide();
+    });
+    const step = (dir: 1 | -1, title: string, glyph: string, disabled: boolean) => {
+      const b = el("button", { type: "button", class: "icon-btn small", title, "aria-label": `${title}: ${name}`, disabled }, glyph);
+      b.addEventListener("click", () => { const idx = zStep(S.deck, S.cur, i, dir); if (idx !== null) { setSel(idx); ui.refresh(); } });
+      return b;
+    };
+    row.append(pick, step(1, "Bring forward", "\u2191", i === objs.length - 1), step(-1, "Send backward", "\u2193", i === 0));
+    list.appendChild(row);
+  }
+  if (!objs.length) list.appendChild(el("p", { class: "hint" }, "This slide is empty. Add something from the ribbon."));
+  const sect = el("div", { class: "sect" });
+  sect.appendChild(list);
+  wrap.appendChild(sect);
+  return wrap;
+}
+
 /* ---------------------------------------------------------------- settings */
 function settingsPanel(): HTMLElement {
   const wrap = el("div");
@@ -347,7 +386,7 @@ function settingsPanel(): HTMLElement {
 export function renderSide(): void {
   const host = $("#side");
   const scroll = host.scrollTop;
-  const panel = S.side === "templates" ? designsPanel() : S.side === "elements" ? elementsPanel() : S.side === "fields" ? fieldsPanel() : settingsPanel();
+  const panel = S.side === "templates" ? designsPanel() : S.side === "elements" ? elementsPanel() : S.side === "fields" ? fieldsPanel() : S.side === "layers" ? layersPanel() : settingsPanel();
   host.replaceChildren(panel);
   host.scrollTop = scroll;
   document.querySelectorAll<HTMLElement>("#rail [data-side]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.side === S.side)));

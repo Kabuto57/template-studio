@@ -3,7 +3,7 @@ import type { Sel } from "../ooxml/edit";
 import type { Model, Project } from "../model/fields";
 
 export type View = "design" | "test" | "code";
-export type SideTab = "templates" | "elements" | "fields" | "settings";
+export type SideTab = "templates" | "elements" | "fields" | "layers" | "settings";
 
 /** The one open template and what the editor is showing. */
 export const S = {
