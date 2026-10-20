@@ -1,7 +1,7 @@
 // The panel on the right: format whatever is selected on the slide.
 import { scanPlaceholders } from "../engine/engine";
 import { cfgKeyOf } from "../model/fields";
-import { readFlip, toggleFlip, replacePicture, readAltText, setAltText, readTableLook, setTableLook, isLine, readArrows, setArrows, readRadius, setRadius, readOpacity, readShadow, setOpacity, setShadow, alignObj, alignObjs, copyObjs, deleteObjs, distributeObjs, groupObjs, pasteObjs, ungroupObj, deleteObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, duplicateObj, inches, IN, readBox, readStyle, selTextNode, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder, type Align, type FieldPayload, type Sel, type ListKind, type TableOp, type TextStyle } from "../ooxml/edit";
+import { readCrop, setCrop, readFlip, toggleFlip, replacePicture, readAltText, setAltText, readTableLook, setTableLook, isLine, readArrows, setArrows, readRadius, setRadius, readOpacity, readShadow, setOpacity, setShadow, alignObj, alignObjs, copyObjs, deleteObjs, distributeObjs, groupObjs, pasteObjs, ungroupObj, deleteObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, duplicateObj, inches, IN, readBox, readStyle, selTextNode, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder, type Align, type FieldPayload, type Sel, type ListKind, type TableOp, type TextStyle } from "../ooxml/edit";
 import { SHAPES } from "../ooxml/shapes";
 import { collectEditables, collectObjects, paraText } from "../ooxml/render";
 import { A_NS, dig, esc, kid, kids, nodeXml, parseXml } from "../ooxml/xml";
@@ -184,10 +184,23 @@ function pictureSection(node: Element): HTMLElement | null {
     const img = f ? await prepareImage(f) : null;
     if (img && replacePicture(S.deck, slide, obj, img.data, img.ext, img.w, img.h)) { ui.refresh(); toast("Picture replaced"); }
   });
+  const crop = readCrop(node)!;
+  const cg = el("div", { class: "cols-4", style: "margin-top:10px" });
+  for (const [k, lab] of [["l", "Left"], ["t", "Top"], ["r", "Right"], ["b", "Bottom"]] as const) {
+    const id = `crop-${k}`;
+    const i = el("input", { class: "inp", id, type: "number", min: "0", max: "45", step: "1", value: String(Math.round(crop[k])), style: "padding:0 6px" });
+    i.addEventListener("change", () => { if (setCrop(S.deck, S.cur, S.sel.obj, { ...crop, [k]: +i.value || 0 })) ui.refresh(); });
+    const w = el("div");
+    w.append(el("label", { class: "lbl", for: id }, lab), i);
+    cg.appendChild(w);
+  }
+  const uncrop = el("button", { class: "btn small quiet", type: "button", disabled: !(crop.l || crop.t || crop.r || crop.b) }, "Reset crop");
+  uncrop.addEventListener("click", () => { if (setCrop(S.deck, S.cur, S.sel.obj, { l: 0, t: 0, r: 0, b: 0 })) ui.refresh(); });
+  const cropParts = [el("span", { class: "lbl", style: "margin-top:10px" }, "Crop, % from each edge"), cg, uncrop];
   const alt = el("textarea", { class: "inp", rows: "2", id: "altText", placeholder: "e.g. Bank logo", spellcheck: "true" });
   alt.value = readAltText(node);
   alt.addEventListener("change", () => { if (setAltText(S.deck, S.cur, S.sel.obj, alt.value)) ui.save(); });
-  sec.append(rep, file, el("label", { class: "lbl", for: "altText", style: "margin-top:10px" }, "Alt text"), alt,
+  sec.append(rep, file, ...cropParts, el("label", { class: "lbl", for: "altText", style: "margin-top:10px" }, "Alt text"), alt,
     el("span", { class: "hint" }, "What a screen reader says for this picture. Leave empty if it is only decoration."));
   return sec;
 }

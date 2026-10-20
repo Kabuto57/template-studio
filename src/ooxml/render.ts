@@ -497,8 +497,20 @@ class Painter {
     if (amt) img.style.opacity = String(num(amt) / 100000);
     this.shadow(img, kid(el, "spPr"), ctx);
     img.style.maxWidth = "none";
-    this.place(img, applyTf(tf, b0));
-    out.appendChild(img);
+    const sr = kid(kid(el, "blipFill"), "srcRect");
+    if (!sr) { this.place(img, applyTf(tf, b0)); out.appendChild(img); return; }
+    // a cropped picture: a clipping frame, with the whole image inside it shifted and enlarged
+    const c = (k: string) => num(sr.getAttribute(k)) / 100000;
+    const frame = document.createElement("div");
+    frame.className = "shp crop";
+    if (ctx.curObj !== undefined) frame.dataset.obj = String(ctx.curObj);
+    delete img.dataset.obj;
+    img.className = "";
+    const w = 1 - c("l") - c("r") || 1, h = 1 - c("t") - c("b") || 1;
+    Object.assign(img.style, { position: "absolute", width: `${100 / w}%`, height: `${100 / h}%`, left: `${-c("l") / w * 100}%`, top: `${-c("t") / h * 100}%` });
+    frame.appendChild(img);
+    this.place(frame, applyTf(tf, b0));
+    out.appendChild(frame);
   }
 
   frame(el: Element, ctx: Ctx, out: HTMLElement, tf: Tf, layer: Layer): void {

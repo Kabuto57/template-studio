@@ -10,7 +10,7 @@ import { fillXml, isSlidePart, newReport, type Data } from "../../src/engine/eng
 import { buildExample, buildModel, buildPrompt, buildSchema, cfgKeyOf, normaliseProject, projectForCode, type Project } from "../../src/model/fields";
 import { buildPython, displayPython, parsePythonFile } from "../../src/model/python";
 import { Deck } from "../../src/ooxml/deck";
-import { BLOCKS, SHAPE_BLOCKS, readAltText, readFlip, readTableLook, replacePicture, setAltText, setTableLook, toggleFlip, deckColours, replaceColour, readOpacity, readShadow, readStyle, setOpacity, setShadow, addBlankSlide, alignObjs, boundsOf, copyObjs, distributeObjs, groupObjs, insertImage, moveObjs, pasteObjs, ungroupObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, alignObj, deleteObj, deleteSlide, duplicateObj, duplicateSlide, insertBlock, moveSlide, placeField, renameField, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder } from "../../src/ooxml/edit";
+import { BLOCKS, SHAPE_BLOCKS, readCrop, setCrop, readAltText, readFlip, readTableLook, replacePicture, setAltText, setTableLook, toggleFlip, deckColours, replaceColour, readOpacity, readShadow, readStyle, setOpacity, setShadow, addBlankSlide, alignObjs, boundsOf, copyObjs, distributeObjs, groupObjs, insertImage, moveObjs, pasteObjs, ungroupObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, alignObj, deleteObj, deleteSlide, duplicateObj, duplicateSlide, insertBlock, moveSlide, placeField, renameField, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder } from "../../src/ooxml/edit";
 import { collectEditables, collectObjects, renderSlide } from "../../src/ooxml/render";
 import { bytesToB64, b64ToBytes, parseXml } from "../../src/ooxml/xml";
 import { buildDeck } from "../../src/templates/builder";
@@ -409,6 +409,14 @@ describe("shapes, pictures and copy-paste", () => {
     expect(readFlip(objs()[pic]!)).toEqual({ h: true, v: false });
     expect(setAltText(deck, 0, pic, "Bank logo")).toBe(true);
     expect(readAltText(objs()[pic]!)).toBe("Bank logo");
+    const before = boundsOf(deck, 0, [pic])!;
+    expect(setCrop(deck, 0, pic, { l: 10, t: 0, r: 10, b: 20 })).toBe(true);
+    expect(readCrop(objs()[pic]!)).toEqual({ l: 10, t: 0, r: 10, b: 20 });
+    const cropped = boundsOf(deck, 0, [pic])!;
+    expect(cropped.cx).toBeCloseTo(before.cx * 0.8, -2);
+    expect(cropped.x).toBeCloseTo(before.x + before.cx * 0.1, -2);
+    expect(setCrop(deck, 0, pic, { l: 0, t: 0, r: 0, b: 0 })).toBe(true);
+    expect(boundsOf(deck, 0, [pic])!.cx).toBeCloseTo(before.cx, -2);
     const w = boundsOf(deck, 0, [pic])!.cx;
     expect(replacePicture(deck, 0, pic, PNG, "png", 1, 1)).toBe(true);
     expect(boundsOf(deck, 0, [pic])!).toMatchObject({ cx: w, cy: w }); // same width, new shape

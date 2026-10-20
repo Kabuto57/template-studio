@@ -358,7 +358,7 @@ function startDrag(e: PointerEvent, slide: HTMLElement, mode: "move" | "resize",
   const ov0 = ov ? { l: parseFloat(ov.style.left), t: parseFloat(ov.style.top), w: parseFloat(ov.style.width), h: parseFloat(ov.style.height) } : null;
   const sizeLbl = slide.querySelector(".overlay .size");
   const lines = snapLines(objs);
-  const isPic = objs.length === 1 && !!slide.querySelector(`img[data-obj="${objs[0]}"]`);
+  const isPic = objs.length === 1 && !!slide.querySelector(`img[data-obj="${objs[0]}"], [data-obj="${objs[0]}"].crop`);
   let moved = false, nb: Rect = box;
   try { slide.setPointerCapture(e.pointerId); } catch { /* pointer already released */ }
   const guide = (dir: "v" | "h", at: number | null) => {

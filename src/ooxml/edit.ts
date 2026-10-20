@@ -698,6 +698,35 @@ export function replacePicture(deck: Deck, slide: number, obj: number | null, da
     put(info.path, serializeXml(doc));
   });
 }
+export interface Crop { l: number; t: number; r: number; b: number }
+/** How much of each edge of a picture is trimmed, in percent. */
+export function readCrop(node: Element): Crop | null {
+  if (node.localName !== "pic") return null;
+  const sr = dig(node, "blipFill", "srcRect");
+  const v = (k: string) => num(sr?.getAttribute(k)) / 1000;
+  return { l: v("l"), t: v("t"), r: v("r"), b: v("b") };
+}
+/** Trim a picture's edges. The frame shrinks or grows with it, so the picture keeps its scale. */
+export function setCrop(deck: Deck, slide: number, obj: number | null, c: Crop): boolean {
+  const cl = (v: number) => Math.min(45, Math.max(0, v));
+  const next = { l: cl(c.l), t: cl(c.t), r: cl(c.r), b: cl(c.b) };
+  return editObj(deck, slide, obj, (node, doc) => {
+    const bf = kid(node, "blipFill"), cur = readCrop(node), info = deck.slides[slide]!;
+    const box = readBox(deck, node, info);
+    if (!bf || !cur || !box) return false;
+    const fw = box.cx / (1 - (cur.l + cur.r) / 100), fh = box.cy / (1 - (cur.t + cur.b) / 100);
+    kid(bf, "srcRect")?.remove();
+    if (next.l || next.t || next.r || next.b) {
+      const sr = doc.createElementNS(A_NS, "a:srcRect");
+      for (const k of ["l", "t", "r", "b"] as const) if (next[k]) sr.setAttribute(k, String(Math.round(next[k] * 1000)));
+      bf.insertBefore(sr, kid(bf, "blip")?.nextSibling ?? null);
+    }
+    writeBox(node, {
+      x: Math.round(box.x + (next.l - cur.l) / 100 * fw), y: Math.round(box.y + (next.t - cur.t) / 100 * fh),
+      cx: Math.round(fw * (1 - (next.l + next.r) / 100)), cy: Math.round(fh * (1 - (next.t + next.b) / 100)),
+    }, box);
+  }, "crop");
+}
 const cNvPrOf = (node: Element): Element | null => [...node.getElementsByTagName("*")].find(e => e.localName === "cNvPr") ?? null;
 export const readAltText = (node: Element): string => cNvPrOf(node)?.getAttribute("descr") ?? "";
 /** The description a screen reader announces for a picture or shape. */

@@ -431,3 +431,4 @@ table.io th { font-weight: 600; color: var(--muted); font-size: var(--fs-xs); }
 .layer-pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 0; background: none; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
 .layer-pick .kind { flex: none; width: 52px; font-size: var(--fs-xs); color: var(--muted); }
 .layer-pick .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }
+.slide .shp.crop { overflow: hidden; }
