@@ -120,7 +120,7 @@ function styleSection(node: Element, title: string): HTMLElement {
     // PowerPoint's grow / shrink font steps
     const STEPS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 54, 60, 66, 72, 80, 88, 96];
     const step = (dir: 1 | -1) => apply({ sz: dir > 0 ? STEPS.find(v => v > st.sz) ?? Math.min(200, st.sz + 8) : [...STEPS].reverse().find(v => v < st.sz) ?? Math.max(6, st.sz - 1) });
-    const grow = el("div", { class: "seg", role: "group", "aria-label": "Font size steps" },
+    const grow = el("div", { class: "seg", role: "group", "aria-label": "Grow or shrink text" },
       '<button type="button" data-d="-1" aria-label="Smaller text" title="Smaller">A<sup>-</sup></button><button type="button" data-d="1" aria-label="Bigger text" title="Bigger">A<sup>+</sup></button>');
     grow.addEventListener("click", e => { const b = (e.target as Element).closest<HTMLElement>("[data-d]"); if (b) step(+b.dataset.d! as 1 | -1); });
     const r1 = el("div", { class: "row tight" });
