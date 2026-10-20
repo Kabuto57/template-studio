@@ -6,7 +6,7 @@ import { fillXml, newReport, type Data } from "../engine/engine";
 import type { Project } from "../model/fields";
 import { fieldType } from "../model/fields";
 import { Deck } from "../ooxml/deck";
-import { SHAPE_BLOCKS, lookOf, blockDef, type BlockDef, type BlockType } from "../ooxml/edit";
+import { SHAPE_BLOCKS, deckColours, replaceColour, lookOf, blockDef, type BlockDef, type BlockType } from "../ooxml/edit";
 import { shapeByGeom } from "../ooxml/shapes";
 import { ICONS, iconSvg } from "../ooxml/icons";
 import { renderSlide } from "../ooxml/render";
@@ -273,6 +273,21 @@ function settingsPanel(): HTMLElement {
   sel.addEventListener("change", () => { S.project.settings.file_name_field = sel.value; ui.save(); });
   out.append(sel, el("span", { class: "hint" }, "Each generated deck takes its file name from this field's value."));
   wrap.appendChild(out);
+
+  const pal = el("div", { class: "sect" });
+  pal.appendChild(el("div", { class: "sect-title" }, "Template colours"));
+  pal.appendChild(el("span", { class: "hint" }, "Change a colour and every slide follows, like a brand kit."));
+  const prow = el("div", { class: "palette" });
+  for (const c of deckColours(S.deck).slice(0, 12)) {
+    const inp = el("input", { type: "color", value: `#${c}`, title: `#${c}: change everywhere`, "aria-label": `Change #${c} everywhere` });
+    inp.addEventListener("change", () => {
+      const to = inp.value.slice(1).toUpperCase();
+      if (to !== c && replaceColour(S.deck, c, to)) { ui.refresh(); toast(`#${c} changed to #${to} on every slide`); }
+    });
+    prow.appendChild(inp);
+  }
+  pal.appendChild(prow);
+  wrap.appendChild(pal);
 
   const rules = el("div", { class: "sect" });
   rules.appendChild(el("div", { class: "sect-title" }, "Table cell colours"));

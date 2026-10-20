@@ -466,6 +466,8 @@ export function openContextMenu(x: number, y: number, actions: { copy: () => boo
     ["Copy", `${mod}C`, () => { actions.copy(); }, has],
     ["Paste", `${mod}V`, () => { actions.paste(); }, actions.canPaste],
     ["Duplicate", `${mod}D`, duplicateSelected, has],
+    ["Copy style", `${mod}\u2325C`.replace("Ctrl+\u2325", "Ctrl+Alt+"), () => { copyStyle(); }, has && !many],
+    ["Paste style", `${mod}\u2325V`.replace("Ctrl+\u2325", "Ctrl+Alt+"), () => { pasteStyle(); }, has && !!styleClip],
     ["Delete", "Del", deleteSelected, has],
     null,
     ["Bring to front", "", () => reorder("front"), has && !many],
@@ -496,3 +498,27 @@ export function openContextMenu(x: number, y: number, actions: { copy: () => boo
 }
 document.addEventListener("pointerdown", e => { if (menu && !(e.target as Element).closest(".ctx-menu")) closeMenu(); });
 window.addEventListener("blur", closeMenu);
+
+/* ---------------------------------------------------------------- copy and paste style */
+let styleClip: (TextStyle & { fill?: string | null }) | null = null;
+/** Remember the selected item's text style and fill (Ctrl+Alt+C). */
+export function copyStyle(): boolean {
+  const info = S.deck.slides[S.cur];
+  if (!info || S.sel.obj === null) return false;
+  const doc = parseXml(S.deck.texts[info.path]!);
+  const node = selTextNode(doc, S.sel) ?? collectObjects(doc)[S.sel.obj];
+  if (!node) return false;
+  const st = readStyle(node);
+  styleClip = { sz: st.sz, b: st.b, i: st.i, u: st.u, strike: st.strike, caps: st.caps, color: st.color, font: st.font, algn: st.algn, fill: st.noFill ? null : st.fill ?? undefined };
+  toast("Style copied. Select something and paste it with Ctrl+Alt+V.");
+  return true;
+}
+/** Apply the remembered style to everything selected (Ctrl+Alt+V). */
+export function pasteStyle(): boolean {
+  if (!styleClip || S.sel.obj === null) return false;
+  let any = false;
+  for (const obj of selected()) any = setStyle(S.deck, S.cur, obj === S.sel.obj ? S.sel : { obj, cell: null }, styleClip) || any;
+  if (any) ui.refresh();
+  return any;
+}
+export const hasStyleClip = (): boolean => !!styleClip;

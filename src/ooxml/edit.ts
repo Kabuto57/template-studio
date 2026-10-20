@@ -659,6 +659,27 @@ export function ungroupObj(deck: Deck, slide: number, obj: number | null): numbe
 }
 const OBJ_TYPES_EDIT = new Set(["sp", "pic", "graphicFrame", "grpSp", "cxnSp"]);
 
+/* ---------------------------------------------------------------- template colours */
+/** Every colour the slides use, most used first. */
+export function deckColours(deck: Deck): string[] {
+  const count = new Map<string, number>();
+  for (const sl of deck.slides) for (const m of (deck.texts[sl.path] ?? "").matchAll(/<a:srgbClr val="([0-9A-Fa-f]{6})"/g)) {
+    const c = m[1]!.toUpperCase();
+    count.set(c, (count.get(c) ?? 0) + 1);
+  }
+  return [...count.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]);
+}
+/** Swap one colour for another on every slide, as one undo step (Canva's "change all"). */
+export function replaceColour(deck: Deck, from: string, to: string): boolean {
+  const re = new RegExp(`(<a:srgbClr val=")${from}(")`, "gi");
+  return deck.transaction(put => {
+    for (const sl of deck.slides) {
+      const xml = deck.texts[sl.path]!, next = xml.replace(re, `$1${to.toUpperCase()}$2`);
+      if (next !== xml) put(sl.path, next);
+    }
+  });
+}
+
 /* ---------------------------------------------------------------- shape look */
 /** How see-through the fill (or picture) is, 0 to 100. */
 export function readOpacity(node: Element): number {

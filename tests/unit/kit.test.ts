@@ -10,7 +10,7 @@ import { fillXml, isSlidePart, newReport, type Data } from "../../src/engine/eng
 import { buildExample, buildModel, buildPrompt, buildSchema, cfgKeyOf, normaliseProject, projectForCode, type Project } from "../../src/model/fields";
 import { buildPython, displayPython, parsePythonFile } from "../../src/model/python";
 import { Deck } from "../../src/ooxml/deck";
-import { BLOCKS, SHAPE_BLOCKS, readOpacity, readShadow, readStyle, setOpacity, setShadow, addBlankSlide, alignObjs, boundsOf, copyObjs, distributeObjs, groupObjs, insertImage, moveObjs, pasteObjs, ungroupObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, alignObj, deleteObj, deleteSlide, duplicateObj, duplicateSlide, insertBlock, moveSlide, placeField, renameField, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder } from "../../src/ooxml/edit";
+import { BLOCKS, SHAPE_BLOCKS, deckColours, replaceColour, readOpacity, readShadow, readStyle, setOpacity, setShadow, addBlankSlide, alignObjs, boundsOf, copyObjs, distributeObjs, groupObjs, insertImage, moveObjs, pasteObjs, ungroupObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, alignObj, deleteObj, deleteSlide, duplicateObj, duplicateSlide, insertBlock, moveSlide, placeField, renameField, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder } from "../../src/ooxml/edit";
 import { collectEditables, collectObjects, renderSlide } from "../../src/ooxml/render";
 import { bytesToB64, b64ToBytes, parseXml } from "../../src/ooxml/xml";
 import { buildDeck } from "../../src/templates/builder";
@@ -397,6 +397,17 @@ describe("shapes, pictures and copy-paste", () => {
     expect(setShadow(deck, 0, 1, true)).toBe(true);
     expect(readShadow(objs()[1]!)).toBe(true);
     write("formatted.pptx", await filled(deck, buildExample(project, buildModel(deck.scan())), project));
+  });
+
+  it("changes a template colour on every slide in one undo step", async () => {
+    const d = DESIGNS.find(x => x.id === "brief")!;
+    const deck = await Deck.load(await buildDeck(d.slides, blank));
+    expect(deckColours(deck)).toContain("E31B23");
+    expect(replaceColour(deck, "E31B23", "0055AA")).toBe(true);
+    expect(deckColours(deck)).not.toContain("E31B23");
+    expect(deck.slides.every(sl => !/E31B23/i.test(deck.texts[sl.path]!))).toBe(true);
+    expect(deck.undo()).toBe(true);
+    expect(deckColours(deck)).toContain("E31B23");
   });
 
   it("aligns, distributes, moves, groups and ungroups several objects", async () => {

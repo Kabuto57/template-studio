@@ -1,9 +1,9 @@
 // The slide in the middle and the filmstrip under it: drawing, selection, move/resize,
 // and drops from the Elements and Fields panels.
 import { fillXml, isSlidePart, newReport, parseContent, type Data, type Report } from "../engine/engine";
-import { BLOCKS, LAYOUTS, addLayoutSlide, type LayoutDef, boundsOf, copyObjs, deleteObjs, insertImage, moveObjs, pasteObjs, type Clip, blockDef, blockSize, deleteSlide, duplicateSlide, inches, insertBlock, moveSlide, placeField, readBox, resizeBox, setBox, snap, type BlockType, type FieldPayload, type Rect } from "../ooxml/edit";
-import { collectObjects, fitPlaceholderBoxes, renderSlide } from "../ooxml/render";
-import { esc, parseXml } from "../ooxml/xml";
+import { BLOCKS, LAYOUTS, selTextNode, setText, addLayoutSlide, type LayoutDef, boundsOf, copyObjs, deleteObjs, insertImage, moveObjs, pasteObjs, type Clip, blockDef, blockSize, deleteSlide, duplicateSlide, inches, insertBlock, moveSlide, placeField, readBox, resizeBox, setBox, snap, type BlockType, type FieldPayload, type Rect } from "../ooxml/edit";
+import { collectObjects, fitPlaceholderBoxes, paraText, renderSlide } from "../ooxml/render";
+import { esc, kid, kids, parseXml } from "../ooxml/xml";
 import { $, ICON, el, toast } from "./dom";
 import { openContextMenu } from "./inspector";
 import { iconSvg, type IconDef } from "../ooxml/icons";
@@ -194,7 +194,7 @@ function onPointerDown(e: PointerEvent): void {
   // Text being typed in the inspector is applied on blur, which redraws the slide. Do that first,
   // then look up what is under the pointer in the fresh DOM.
   const typing = document.activeElement as HTMLElement | null;
-  if (typing?.closest("#insp, #side")) typing.blur();
+  if (typing?.closest("#insp, #side, .inline-edit")) typing.blur();
   const slide = document.getElementById("mainSlide");
   const target = document.elementFromPoint(e.clientX, e.clientY);
   if (!slide || !target || !slide.contains(target)) return;
@@ -216,6 +216,50 @@ function onPointerDown(e: PointerEvent): void {
   const next = { obj: i, cell: td ? +td.dataset.edit! : null };
   if (S.sel.obj !== next.obj || S.sel.cell !== next.cell || S.multi.length) ui.select(next);
   startDrag(e, slide, "move");
+}
+
+/** Double-click a text box or table cell to type straight onto the slide, like PowerPoint. */
+function inlineEdit(): boolean {
+  const slide = document.getElementById("mainSlide"), info = S.deck.slides[S.cur];
+  if (!slide || !info || S.sel.obj === null || S.multi.length || S.view !== "design") return false;
+  const node = selTextNode(parseXml(S.deck.texts[info.path]!), S.sel);
+  if (!node) return false;
+  const host = S.sel.cell !== null ? slide.querySelector<HTMLElement>(`td.hit[data-edit="${S.sel.cell}"]`) : slide.querySelector<HTMLElement>(`[data-obj="${S.sel.obj}"]`);
+  if (!host) return false;
+  const sr = slide.getBoundingClientRect(), hr = host.getBoundingClientRect();
+  const span = host.querySelector<HTMLElement>(".para span") ?? host;
+  const cs = getComputedStyle(span), ps = getComputedStyle(host.querySelector(".para") ?? host);
+  const ta = el("textarea", { class: "inline-edit", spellcheck: "true", "aria-label": "Edit text" });
+  ta.value = kids(kid(node, "txBody"), "p").map(paraText).join("\n");
+  Object.assign(ta.style, {
+    left: `${hr.left - sr.left}px`, top: `${hr.top - sr.top}px`, width: `${hr.width}px`, minHeight: `${hr.height}px`,
+    fontSize: cs.fontSize, fontFamily: cs.fontFamily, fontWeight: cs.fontWeight, fontStyle: cs.fontStyle, color: cs.color, textAlign: ps.textAlign, lineHeight: ps.lineHeight,
+  });
+  const txt = host.querySelector<HTMLElement>(".txt") ?? host;
+  const was = txt.style.visibility;
+  txt.style.visibility = "hidden";
+  slide.querySelector(".overlay")?.setAttribute("hidden", "");
+  slide.appendChild(ta);
+  const grow = () => { ta.style.height = "auto"; ta.style.height = `${Math.max(hr.height, ta.scrollHeight)}px`; };
+  grow();
+  ta.focus();
+  ta.select();
+  const sel = { ...S.sel }, slideNo = S.cur;
+  let done = false;
+  const finish = (save: boolean) => {
+    if (done) return;
+    done = true;
+    ta.remove();
+    txt.style.visibility = was;
+    if (save && setText(S.deck, slideNo, sel, ta.value)) ui.refresh(); else ui.drawOverlay();
+  };
+  ta.addEventListener("input", grow);
+  ta.addEventListener("blur", () => finish(true));
+  ta.addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false); }
+    else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); finish(true); }
+  });
+  return true;
 }
 
 /** Drag a box on an empty part of the slide to select everything inside it. */
@@ -461,10 +505,7 @@ export function doPlaceField(editIdx: number, payload: FieldPayload): void {
 export function wireStage(openFile: (f: File) => void): void {
   const stage = $("#stage");
   $("#slideHost").addEventListener("pointerdown", onPointerDown);
-  $("#slideHost").addEventListener("dblclick", () => {
-    const t = document.getElementById("inspText") as HTMLTextAreaElement | null;
-    if (t) { t.focus(); t.select(); }
-  });
+  $("#slideHost").addEventListener("dblclick", () => { if (!inlineEdit()) { const t = document.getElementById("inspText") as HTMLTextAreaElement | null; t?.focus(); t?.select(); } });
   stage.addEventListener("dragover", e => {
     if ([...(e.dataTransfer?.types ?? [])].includes("Files")) { e.preventDefault(); stage.classList.add("file-over"); return; }
     if (!dragInfo || S.view !== "design") return;

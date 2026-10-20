@@ -402,3 +402,9 @@ table.io th { font-weight: 600; color: var(--muted); font-size: var(--fs-xs); }
 .keys dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 8px 0 0; }
 .keys dt, .keys dd { margin: 0; }
 .keys kbd { font: inherit; font-size: var(--fs-xs); padding: 1px 6px; border: 1px solid var(--line-2); border-radius: 5px; background: var(--work); white-space: nowrap; }
+.slide .inline-edit { position: absolute; z-index: 25; margin: 0; padding: 0 2px; resize: none; overflow: hidden; border: 1.5px solid var(--primary); border-radius: 2px; background: rgba(255, 255, 255, .92); outline: none; box-shadow: 0 0 0 3px rgba(43, 80, 237, .15); }
+.palette { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.palette input[type=color] { width: 34px; height: 34px; padding: 0; border: 1px solid var(--line-2); border-radius: 50%; background: none; cursor: pointer; overflow: hidden; }
+.palette input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+.palette input[type=color]::-webkit-color-swatch { border: 0; border-radius: 50%; }
+.palette input[type=color]::-moz-color-swatch { border: 0; border-radius: 50%; }

@@ -436,3 +436,17 @@ test("clicking the open panel's tab folds it away for more room", async ({ page 
   await page.click("#rail [data-side=elements]");
   await expect(page.locator("#side")).toBeVisible();
 });
+
+test("double-click a text box to type on the slide", async ({ page }) => {
+  await startBlank(page);
+  await showPanel(page, "elements");
+  await page.click(".block[data-type=label]");
+  await page.locator('#mainSlide [data-obj="0"]').dblclick();
+  await expect(page.locator(".inline-edit")).toBeFocused();
+  await page.keyboard.type("Typed in place");
+  await page.keyboard.press("ControlOrMeta+Enter");
+  await expect(page.locator(".inline-edit")).toHaveCount(0);
+  await expect(page.locator("#mainSlide")).toContainText("Typed in place");
+  await page.click("#undoBtn");
+  await expect(page.locator("#mainSlide")).not.toContainText("Typed in place");
+});
