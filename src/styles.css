@@ -370,3 +370,11 @@ table.io th { font-weight: 600; color: var(--muted); font-size: var(--fs-xs); }
 .ins-pop { position: fixed; z-index: 50; width: 330px; max-height: 70vh; overflow: auto; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(20, 23, 42, .18); }
 .ins-pop .sect-title { margin-bottom: 8px; }
 .caret { display: inline-block; width: 0; height: 0; margin-left: 2px; vertical-align: middle; border: 4px solid transparent; border-top-color: currentColor; border-bottom: 0; }
+
+.slide .overlay.item { border: 1px solid var(--primary); pointer-events: none; }
+.slide .overlay.all { border: 1px dashed var(--primary); pointer-events: none; background: none; }
+.slide .guide { position: absolute; z-index: 21; pointer-events: none; background: #E8318A; }
+.slide .guide.v { top: 0; bottom: 0; width: 1px; }
+.slide .guide.h { left: 0; right: 0; height: 1px; }
+.slide .marquee { position: absolute; z-index: 21; pointer-events: none; border: 1px solid var(--primary); background: rgba(43, 80, 237, .08); }
+.slide svg, .shape-btn svg, .ins-btn svg { stroke: none; }

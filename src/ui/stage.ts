@@ -1,11 +1,11 @@
 // The slide in the middle and the filmstrip under it: drawing, selection, move/resize,
 // and drops from the Elements and Fields panels.
 import { fillXml, isSlidePart, newReport, parseContent, type Data, type Report } from "../engine/engine";
-import { BLOCKS, addBlankSlide, copyObj, deleteObj, insertImage, pasteObj, type Clip, blockDef, blockSize, deleteSlide, duplicateSlide, inches, insertBlock, moveSlide, placeField, readBox, resizeBox, setBox, snap, type BlockType, type FieldPayload, type Rect } from "../ooxml/edit";
+import { BLOCKS, addBlankSlide, boundsOf, copyObjs, deleteObjs, insertImage, moveObjs, pasteObjs, type Clip, blockDef, blockSize, deleteSlide, duplicateSlide, inches, insertBlock, moveSlide, placeField, readBox, resizeBox, setBox, snap, type BlockType, type FieldPayload, type Rect } from "../ooxml/edit";
 import { collectObjects, fitPlaceholderBoxes, renderSlide } from "../ooxml/render";
 import { esc, parseXml } from "../ooxml/xml";
 import { $, ICON, el, toast } from "./dom";
-import { S, clearSel, ui } from "./state";
+import { S, clearSel, selected, setSel, ui } from "./state";
 
 /* ---------------------------------------------------------------- filling for the Test view */
 export function parseTest(): { data?: Data; error?: string } {
@@ -139,11 +139,23 @@ function currentBox(): Rect | null {
 export function drawOverlay(): void {
   const slide = document.getElementById("mainSlide");
   if (!slide) return;
-  slide.querySelector(".overlay")?.remove();
+  slide.querySelectorAll(".overlay, .guide, .marquee").forEach(e => e.remove());
   slide.querySelectorAll(".cellsel").forEach(e => e.classList.remove("cellsel"));
   if (S.sel.obj === null || S.view !== "design") return;
   const rc = objRect(slide, S.sel.obj);
   if (!rc) { clearSel(); return; }
+  S.multi = S.multi.filter(i => objRect(slide, i));
+  if (S.multi.length) {
+    // several selected: a thin outline on each and one dashed box around them all
+    const rects = selected().map(i => objRect(slide, i)!);
+    for (const r of rects) slide.appendChild(el("div", { class: "overlay item", style: `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px` }));
+    const l = Math.min(...rects.map(r => r.left)), t = Math.min(...rects.map(r => r.top));
+    const w = Math.max(...rects.map(r => r.left + r.width)) - l, h = Math.max(...rects.map(r => r.top + r.height)) - t;
+    const ov = el("div", { class: "overlay all", style: `left:${l}px;top:${t}px;width:${w}px;height:${h}px` });
+    ov.appendChild(el("div", { class: "size" }, `${selected().length} selected`));
+    slide.appendChild(ov);
+    return;
+  }
   const ov = el("div", { class: "overlay", style: `left:${rc.left}px;top:${rc.top}px;width:${rc.width}px;height:${rc.height}px` });
   for (const h of ["nw", "n", "ne", "e", "se", "s", "sw", "w"]) ov.appendChild(el("div", { class: "h", "data-h": h }));
   const b = currentBox();
@@ -165,38 +177,122 @@ function onPointerDown(e: PointerEvent): void {
   const h = target.closest<HTMLElement>(".h");
   if (h) { e.preventDefault(); return startDrag(e, slide, "resize", h.dataset.h); }
   const obj = target.closest<HTMLElement>("[data-obj]");
-  if (!obj) { if (S.sel.obj !== null) ui.select({ obj: null, cell: null }); return; }
+  if (!obj) { e.preventDefault(); return startMarquee(e, slide); }
   e.preventDefault();
+  const i = +obj.dataset.obj!;
+  if (e.shiftKey || e.ctrlKey || e.metaKey) {
+    // Shift+click adds to or takes away from the selection
+    const cur = selected();
+    const next = cur.includes(i) ? cur.filter(x => x !== i) : [...cur, i];
+    ui.select({ obj: next[0] ?? null, cell: null }, { multi: next.slice(1) });
+    return;
+  }
+  if (S.multi.length && selected().includes(i)) return startDrag(e, slide, "move");
   const td = target.closest<HTMLElement>("td.hit");
-  const next = { obj: +obj.dataset.obj!, cell: td ? +td.dataset.edit! : null };
-  if (S.sel.obj !== next.obj || S.sel.cell !== next.cell) ui.select(next);
+  const next = { obj: i, cell: td ? +td.dataset.edit! : null };
+  if (S.sel.obj !== next.obj || S.sel.cell !== next.cell || S.multi.length) ui.select(next);
   startDrag(e, slide, "move");
 }
 
+/** Drag a box on an empty part of the slide to select everything inside it. */
+function startMarquee(e: PointerEvent, slide: HTMLElement): void {
+  const sr = slide.getBoundingClientRect();
+  const x0 = e.clientX - sr.left, y0 = e.clientY - sr.top;
+  let box: HTMLElement | null = null;
+  try { slide.setPointerCapture(e.pointerId); } catch { /* pointer already released */ }
+  const rectOf = (ev: PointerEvent) => {
+    const x1 = ev.clientX - sr.left, y1 = ev.clientY - sr.top;
+    return { left: Math.min(x0, x1), top: Math.min(y0, y1), width: Math.abs(x1 - x0), height: Math.abs(y1 - y0) };
+  };
+  const move = (ev: PointerEvent) => {
+    const r = rectOf(ev);
+    if (!box && Math.hypot(r.width, r.height) < 4) return;
+    box ??= slide.appendChild(el("div", { class: "marquee" }));
+    Object.assign(box.style, { left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px" });
+  };
+  const up = (ev: PointerEvent) => {
+    slide.removeEventListener("pointermove", move);
+    slide.removeEventListener("pointerup", up);
+    slide.removeEventListener("pointercancel", up);
+    box?.remove();
+    if (!box) { if (S.sel.obj !== null) ui.select({ obj: null, cell: null }); return; }
+    const m = rectOf(ev);
+    const n = collectObjects(parseXml(S.deck.texts[S.deck.slides[S.cur]!.path]!)).length;
+    const hits: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const r = objRect(slide, i);
+      if (r && r.left >= m.left - 1 && r.top >= m.top - 1 && r.left + r.width <= m.left + m.width + 1 && r.top + r.height <= m.top + m.height + 1) hits.push(i);
+    }
+    ui.select({ obj: hits[0] ?? null, cell: null }, { multi: hits.slice(1) });
+  };
+  slide.addEventListener("pointermove", move);
+  slide.addEventListener("pointerup", up);
+  slide.addEventListener("pointercancel", up);
+}
+
+/** Edges and centres other objects and the slide offer for snapping, in EMU. */
+function snapLines(exclude: number[]): { xs: number[]; ys: number[] } {
+  const info = S.deck.slides[S.cur]!;
+  const xs = [0, S.deck.W / 2, S.deck.W], ys = [0, S.deck.H / 2, S.deck.H];
+  collectObjects(parseXml(S.deck.texts[info.path]!)).forEach((n, i) => {
+    if (exclude.includes(i)) return;
+    const b = readBox(S.deck, n, info);
+    if (b) { xs.push(b.x, b.x + b.cx / 2, b.x + b.cx); ys.push(b.y, b.y + b.cy / 2, b.y + b.cy); }
+  });
+  return { xs, ys };
+}
+/** Move `start` so one of its edges or its centre lands on a line within `tol`. */
+function snapTo(start: number, size: number, lines: number[], tol: number): { at: number; line: number | null } {
+  let best = { d: tol + 1, at: start, line: null as number | null };
+  for (const l of lines) for (const off of [0, size / 2, size]) {
+    const d = Math.abs(start + off - l);
+    if (d < best.d) best = { d, at: l - off, line: l };
+  }
+  return { at: best.at, line: best.line };
+}
+
 function startDrag(e: PointerEvent, slide: HTMLElement, mode: "move" | "resize", handle = ""): void {
-  const box = currentBox();
+  const objs = selected();
+  const box = objs.length > 1 ? boundsOf(S.deck, S.cur, objs) : currentBox();
   if (!box) return;
   const k = S.deck.W / slide.clientWidth; // EMU per CSS pixel
   const sx = e.clientX, sy = e.clientY;
-  const els = [...slide.querySelectorAll<HTMLElement>(`[data-obj="${S.sel.obj}"]`)];
-  const ov = slide.querySelector<HTMLElement>(".overlay");
+  const els = objs.flatMap(i => [...slide.querySelectorAll<HTMLElement>(`[data-obj="${i}"]`)]);
+  const ovs = [...slide.querySelectorAll<HTMLElement>(".overlay")];
+  const ov = slide.querySelector<HTMLElement>(".overlay:not(.item):not(.all)");
   const ov0 = ov ? { l: parseFloat(ov.style.left), t: parseFloat(ov.style.top), w: parseFloat(ov.style.width), h: parseFloat(ov.style.height) } : null;
-  const sizeLbl = ov?.querySelector(".size");
+  const sizeLbl = slide.querySelector(".overlay .size");
+  const lines = snapLines(objs);
+  const isPic = objs.length === 1 && !!slide.querySelector(`img[data-obj="${objs[0]}"]`);
   let moved = false, nb: Rect = box;
   try { slide.setPointerCapture(e.pointerId); } catch { /* pointer already released */ }
+  const guide = (dir: "v" | "h", at: number | null) => {
+    slide.querySelector(`.guide.${dir}`)?.remove();
+    if (at !== null) slide.appendChild(el("div", { class: `guide ${dir}`, style: dir === "v" ? `left:${at / k}px` : `top:${at / k}px` }));
+  };
   const move = (ev: PointerEvent) => {
     const dx = ev.clientX - sx, dy = ev.clientY - sy;
     if (!moved && Math.hypot(dx, dy) < 4) return;
     moved = true;
     if (mode === "move") {
-      nb = { ...box, x: snap(box.x + dx * k), y: snap(box.y + dy * k) };
+      // snap to other objects and the slide's edges and centre; hold Alt to place freely
+      const tol = ev.altKey ? -1 : 6 * k;
+      const gx = snapTo(box.x + dx * k, box.cx, lines.xs, tol), gy = snapTo(box.y + dy * k, box.cy, lines.ys, tol);
+      nb = { ...box, x: gx.line === null ? snap(gx.at) : Math.round(gx.at), y: gy.line === null ? snap(gy.at) : Math.round(gy.at) };
+      guide("v", gx.line); guide("h", gy.line);
       const tr = `${(nb.x - box.x) / k}px ${(nb.y - box.y) / k}px`;
       els.forEach(x => { x.style.translate = tr; });
-      if (ov) ov.style.translate = tr;
-      if (sizeLbl) sizeLbl.textContent = `${inches(nb.x)}, ${inches(nb.y)} in`;
+      ovs.forEach(o => { o.style.translate = tr; });
+      if (sizeLbl && objs.length === 1) sizeLbl.textContent = `${inches(nb.x)}, ${inches(nb.y)} in`;
     } else {
-      const r = resizeBox(box, handle, dx * k, dy * k);
-      nb = { x: snap(r.x), y: snap(r.y), cx: snap(r.cx), cy: snap(r.cy) };
+      let r = resizeBox(box, handle, dx * k, dy * k);
+      // corners keep the proportions for pictures, or for anything with Shift held
+      if ((ev.shiftKey || isPic) && handle.length === 2 && box.cx && box.cy) {
+        const f = Math.max(r.cx / box.cx, r.cy / box.cy);
+        const cx = box.cx * f, cy = box.cy * f;
+        r = { cx, cy, x: handle.includes("w") ? box.x + box.cx - cx : box.x, y: handle.includes("n") ? box.y + box.cy - cy : box.y };
+        nb = { x: Math.round(r.x), y: Math.round(r.y), cx: Math.round(r.cx), cy: Math.round(r.cy) };
+      } else nb = { x: snap(r.x), y: snap(r.y), cx: snap(r.cx), cy: snap(r.cy) };
       if (ov && ov0) {
         const sxr = ov0.w / (box.cx / k || 1), syr = ov0.h / (box.cy / k || 1);
         Object.assign(ov.style, { left: ov0.l + (nb.x - box.x) / k + "px", top: ov0.t + (nb.y - box.y) / k + "px", width: nb.cx / k * sxr + "px", height: nb.cy / k * syr + "px" });
@@ -208,8 +304,10 @@ function startDrag(e: PointerEvent, slide: HTMLElement, mode: "move" | "resize",
     slide.removeEventListener("pointermove", move);
     slide.removeEventListener("pointerup", up);
     slide.removeEventListener("pointercancel", up);
+    guide("v", null); guide("h", null);
     if (!moved) return;
-    if (setBox(S.deck, S.cur, S.sel.obj, () => nb)) ui.refresh(); else ui.renderStage();
+    const ok = objs.length > 1 ? moveObjs(S.deck, S.cur, objs, nb.x - box.x, nb.y - box.y) : setBox(S.deck, S.cur, S.sel.obj, () => nb);
+    if (ok) ui.refresh(); else ui.renderStage();
   };
   slide.addEventListener("pointermove", move);
   slide.addEventListener("pointerup", up);
@@ -252,7 +350,7 @@ export function makeDraggable(node: HTMLElement, info: DragInfo): void {
 export function doInsertBlock(type: BlockType, centre?: { x: number; y: number }): void {
   const made = insertBlock(S.deck, S.project, S.cur, type, centre);
   if (!made) return;
-  S.sel = { obj: made.obj, cell: null };
+  setSel(made.obj);
   S.selField = null;
   ui.refresh();
   toast(made.note ? `Added ${made.label.toLowerCase()} with ${made.note}` : `Added ${made.label.toLowerCase()}`);
@@ -283,7 +381,7 @@ export async function doInsertImage(file: File): Promise<void> {
   const obj = insertImage(S.deck, S.cur, data, ext, bmp.width, bmp.height);
   bmp.close();
   if (obj === null) return;
-  S.sel = { obj, cell: null };
+  setSel(obj);
   S.selField = null;
   ui.refresh();
   toast(`Added picture (${Math.round(data.length / 1024)} KB)`);
@@ -292,14 +390,14 @@ export async function doInsertImage(file: File): Promise<void> {
 let clip: Clip | null = null;
 const CLIP_MARK = "[Template Studio element]";
 export function copySelected(): boolean {
-  clip = copyObj(S.deck, S.cur, S.sel.obj);
+  clip = copyObjs(S.deck, S.cur, selected());
   return !!clip;
 }
 export function pasteClip(): boolean {
   if (!clip) return false;
-  const obj = pasteObj(S.deck, S.cur, clip);
-  if (obj === null) return false;
-  S.sel = { obj, cell: null };
+  const got = pasteObjs(S.deck, S.cur, clip);
+  if (!got.length) return false;
+  setSel(got[0]!, got.slice(1));
   ui.refresh();
   return true;
 }
@@ -310,6 +408,7 @@ export function doPlaceField(editIdx: number, payload: FieldPayload): void {
   const root = placed.key.replace(/^count:/, "").split(/[.=]/)[0];
   S.project.pending = (S.project.pending ?? []).filter(p => p !== root);
   S.sel = placed.sel;
+  S.multi = [];
   ui.refresh();
   toast(`Placed {{${placed.key}}}`);
 }
@@ -360,7 +459,7 @@ export function wireStage(openFile: (f: File) => void): void {
     if (typingIn(e) || S.sel.obj === null || document.getSelection()?.toString() || !copySelected()) return;
     e.preventDefault();
     e.clipboardData?.setData("text/plain", CLIP_MARK);
-    if (cut && deleteObj(S.deck, S.cur, S.sel.obj)) { clearSel(); ui.refresh(); }
+    if (cut && deleteObjs(S.deck, S.cur, selected())) { clearSel(); ui.refresh(); }
   };
   document.addEventListener("copy", e => onCopy(e, false));
   document.addEventListener("cut", e => onCopy(e, true));

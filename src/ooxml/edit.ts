@@ -468,42 +468,148 @@ const picXml = (id: number, rid: string, b: Rect): string =>
   `<p:spPr><a:xfrm><a:off x="${b.x}" y="${b.y}"/><a:ext cx="${b.cx}" cy="${b.cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
 
 /* ---------------------------------------------------------------- copy and paste */
-/** A copied object: its XML, plus the media its pictures point at, keyed by relationship id. */
-export interface Clip { xml: string; media: Record<string, string> }
+/** Copied objects: their XML, plus the media their pictures point at, keyed by relationship id. */
+export interface Clip { xmls: string[]; media: Record<string, string> }
 const embedsOf = (node: Element): Element[] => [...node.getElementsByTagNameNS(A_NS, "blip")];
-export function copyObj(deck: Deck, slide: number, obj: number | null): Clip | null {
+export function copyObjs(deck: Deck, slide: number, objs: number[]): Clip | null {
   const info = deck.slides[slide];
-  const node = info && obj !== null ? collectObjects(parseXml(deck.texts[info.path]!))[obj] : undefined;
-  if (!info || !node) return null;
+  if (!info) return null;
+  const all = collectObjects(parseXml(deck.texts[info.path]!));
+  const nodes = [...new Set(objs)].sort((a, b) => a - b).map(i => all[i]).filter((n): n is Element => !!n);
+  if (!nodes.length) return null;
   const rels = deck.relsOf(info.path), media: Record<string, string> = {};
-  for (const b of embedsOf(node)) {
+  for (const n of nodes) for (const b of embedsOf(n)) {
     const rid = b.getAttributeNS(R_NS, "embed") ?? "", t = rels[rid]?.target;
     if (t) media[rid] = t;
   }
-  return { xml: nodeXml(node), media };
+  return { xmls: nodes.map(nodeXml), media };
 }
-/** Paste a copied object onto a slide, nudged so it doesn't sit exactly on its original. */
-export function pasteObj(deck: Deck, slide: number, clip: Clip): number | null {
+/** Paste copied objects onto a slide, nudged so they don't sit exactly on the originals. Returns their indices. */
+export function pasteObjs(deck: Deck, slide: number, clip: Clip): number[] {
   const info = deck.slides[slide];
-  if (!info) return null;
-  let obj: number | null = null;
+  if (!info) return [];
+  let out: number[] = [];
   deck.transaction(put => {
     const doc = parseXml(deck.texts[info.path]!);
-    const node = importXml(doc, clip.xml);
-    for (const b of embedsOf(node)) {
-      const t = clip.media[b.getAttributeNS(R_NS, "embed") ?? ""];
-      if (t && deck.zip.has(t)) b.setAttributeNS(R_NS, "r:embed", addRel(deck, info.path, put, t));
+    const tree = dig(doc.documentElement, "cSld", "spTree")!;
+    const added: Element[] = [];
+    for (const xml of clip.xmls) {
+      const node = importXml(doc, xml);
+      for (const b of embedsOf(node)) {
+        const t = clip.media[b.getAttributeNS(R_NS, "embed") ?? ""];
+        if (t && deck.zip.has(t)) b.setAttributeNS(R_NS, "r:embed", addRel(deck, info.path, put, t));
+      }
+      let id = nextShapeId(doc);
+      for (const c of node.getElementsByTagName("*")) if (c.localName === "cNvPr") c.setAttribute("id", String(id++));
+      tree.appendChild(node);
+      const b = readBox(deck, node, info);
+      if (b) writeBox(node, { ...b, x: Math.min(b.x + GRID * 4, deck.W - b.cx), y: Math.min(b.y + GRID * 4, deck.H - b.cy) });
+      added.push(node);
     }
-    const cnv = [...node.getElementsByTagName("*")].find(e => e.localName === "cNvPr");
-    if (cnv) cnv.setAttribute("id", String(nextShapeId(doc)));
-    dig(doc.documentElement, "cSld", "spTree")!.appendChild(node);
-    const b = readBox(deck, node, info);
-    if (b) writeBox(node, { ...b, x: Math.min(b.x + GRID * 4, deck.W - b.cx), y: Math.min(b.y + GRID * 4, deck.H - b.cy) });
-    obj = collectObjects(doc).length - 1;
+    const all = collectObjects(doc);
+    out = added.map(n => all.indexOf(n));
     put(info.path, serializeXml(doc));
   });
-  return obj;
+  return out;
 }
+
+/* ---------------------------------------------------------------- several objects at once */
+function editObjs(deck: Deck, slide: number, objs: number[], fn: (nodes: Element[], doc: Document, info: SlideInfo) => boolean | void, mergeKey?: string): boolean {
+  const info = deck.slides[slide];
+  if (!info || !objs.length) return false;
+  return deck.mutate(info.path, doc => {
+    const all = collectObjects(doc);
+    const nodes = [...new Set(objs)].sort((a, b) => a - b).map(i => all[i]).filter((n): n is Element => !!n);
+    return nodes.length ? fn(nodes, doc, info) : false;
+  }, mergeKey);
+}
+const unionOf = (boxes: Rect[]): Rect => {
+  const x = Math.min(...boxes.map(b => b.x)), y = Math.min(...boxes.map(b => b.y));
+  return { x, y, cx: Math.max(...boxes.map(b => b.x + b.cx)) - x, cy: Math.max(...boxes.map(b => b.y + b.cy)) - y };
+};
+/** The box around several objects. */
+export function boundsOf(deck: Deck, slide: number, objs: number[]): Rect | null {
+  const info = deck.slides[slide];
+  if (!info) return null;
+  const all = collectObjects(parseXml(deck.texts[info.path]!));
+  const boxes = objs.map(i => all[i] && readBox(deck, all[i]!, info)).filter((b): b is Rect => !!b);
+  return boxes.length ? unionOf(boxes) : null;
+}
+export function moveObjs(deck: Deck, slide: number, objs: number[], dx: number, dy: number, mergeKey?: string): boolean {
+  return editObjs(deck, slide, objs, (nodes, _d, info) => {
+    for (const n of nodes) { const b = readBox(deck, n, info); if (b) writeBox(n, { ...b, x: b.x + dx, y: b.y + dy }, b); }
+  }, mergeKey);
+}
+export const deleteObjs = (deck: Deck, slide: number, objs: number[]): boolean =>
+  editObjs(deck, slide, objs, nodes => { nodes.forEach(n => n.remove()); });
+/** Line up several objects with the box around them, like PowerPoint's Align Selected Objects. */
+export function alignObjs(deck: Deck, slide: number, objs: number[], how: Align): boolean {
+  return editObjs(deck, slide, objs, (nodes, _d, info) => {
+    const boxes = nodes.map(n => readBox(deck, n, info));
+    const u = unionOf(boxes.filter((b): b is Rect => !!b));
+    nodes.forEach((n, i) => {
+      const b = boxes[i];
+      if (!b) return;
+      const x = how === "left" ? u.x : how === "centre" ? u.x + (u.cx - b.cx) / 2 : how === "right" ? u.x + u.cx - b.cx : b.x;
+      const y = how === "top" ? u.y : how === "middle" ? u.y + (u.cy - b.cy) / 2 : how === "bottom" ? u.y + u.cy - b.cy : b.y;
+      writeBox(n, { ...b, x: Math.round(x), y: Math.round(y) }, b);
+    });
+  });
+}
+/** Equal gaps between three or more objects, across or down. */
+export function distributeObjs(deck: Deck, slide: number, objs: number[], axis: "h" | "v"): boolean {
+  if (objs.length < 3) return false;
+  return editObjs(deck, slide, objs, (nodes, _d, info) => {
+    const items = nodes.map(n => ({ n, b: readBox(deck, n, info)! })).filter(t => t.b);
+    const [p, s] = axis === "h" ? ["x", "cx"] as const : ["y", "cy"] as const;
+    items.sort((a, b) => a.b[p] - b.b[p]);
+    const first = items[0]!.b, last = items[items.length - 1]!.b;
+    const gap = (last[p] + last[s] - first[p] - items.reduce((a, t) => a + t.b[s], 0)) / (items.length - 1);
+    let at = first[p];
+    for (const t of items) { writeBox(t.n, { ...t.b, [p]: Math.round(at) }, t.b); at += t.b[s] + gap; }
+  });
+}
+/** Put several objects into one group (Ctrl+G). Returns the group's index. */
+export function groupObjs(deck: Deck, slide: number, objs: number[]): number | null {
+  if (objs.length < 2) return null;
+  let idx: number | null = null;
+  const ok = editObjs(deck, slide, objs, (nodes, doc, info) => {
+    if (nodes.length < 2) return false;
+    const boxes = nodes.map(n => readBox(deck, n, info)).filter((b): b is Rect => !!b);
+    const u = unionOf(boxes), id = nextShapeId(doc);
+    const off = `<a:off x="${u.x}" y="${u.y}"/><a:ext cx="${u.cx}" cy="${u.cy}"/>`;
+    const g = importXml(doc, `<p:grpSp><p:nvGrpSpPr><p:cNvPr id="${id}" name="Group ${id}"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>` +
+      `<p:grpSpPr><a:xfrm>${off}<a:chOff x="${u.x}" y="${u.y}"/><a:chExt cx="${u.cx}" cy="${u.cy}"/></a:xfrm></p:grpSpPr></p:grpSp>`);
+    nodes[nodes.length - 1]!.after(g);
+    for (const n of nodes) g.appendChild(n);
+    idx = collectObjects(doc).indexOf(g);
+  });
+  return ok ? idx : null;
+}
+/** Break a group back into its parts, keeping where they appear. Returns their indices. */
+export function ungroupObj(deck: Deck, slide: number, obj: number | null): number[] {
+  let out: number[] = [];
+  editObj(deck, slide, obj, (g, doc) => {
+    if (g.localName !== "grpSp") return false;
+    const x = dig(g, "grpSpPr", "xfrm");
+    const n = (tag: string, a: string) => num(kid(x, tag)?.getAttribute(a));
+    const [ox, oy, ex, ey] = [n("off", "x"), n("off", "y"), n("ext", "cx"), n("ext", "cy")];
+    const [cx0, cy0, cw, ch] = [n("chOff", "x"), n("chOff", "y"), n("chExt", "cx") || ex, n("chExt", "cy") || ey];
+    const sx = cw ? ex / cw : 1, sy = ch ? ey / ch : 1;
+    // ponytail: a rotated or flipped group loses its rotation here; children keep their own
+    const kidsOut = [...g.children].filter(c => OBJ_TYPES_EDIT.has(c.localName));
+    for (const c of kidsOut) {
+      const b = xfrmOf(xfrmHolder(c));
+      if (b) writeBox(c, { x: ox + (b.x - cx0) * sx, y: oy + (b.y - cy0) * sy, cx: b.cx * sx, cy: b.cy * sy }, b);
+      g.before(c);
+    }
+    g.remove();
+    const all = collectObjects(doc);
+    out = kidsOut.map(c => all.indexOf(c));
+  });
+  return out;
+}
+const OBJ_TYPES_EDIT = new Set(["sp", "pic", "graphicFrame", "grpSp", "cxnSp"]);
 
 /* ---------------------------------------------------------------- shape look */
 export function readGeom(node: Element): string | null {

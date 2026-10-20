@@ -1,14 +1,14 @@
 // The panel on the right: format whatever is selected on the slide.
 import { scanPlaceholders } from "../engine/engine";
 import { cfgKeyOf } from "../model/fields";
-import { alignObj, deleteObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, duplicateObj, inches, IN, readBox, readStyle, selTextNode, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder, type Align, type FieldPayload, type Sel, type TableOp, type TextStyle } from "../ooxml/edit";
+import { alignObj, alignObjs, copyObjs, deleteObjs, distributeObjs, groupObjs, pasteObjs, ungroupObj, deleteObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, duplicateObj, inches, IN, readBox, readStyle, selTextNode, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder, type Align, type FieldPayload, type Sel, type TableOp, type TextStyle } from "../ooxml/edit";
 import { SHAPES } from "../ooxml/shapes";
 import { collectEditables, collectObjects, paraText } from "../ooxml/render";
 import { A_NS, esc, kid, kids, nodeXml, parseXml } from "../ooxml/xml";
 import { $, ICON, debounce, el, toast } from "./dom";
 import { fieldEditor } from "./fields";
 import { doPlaceField } from "./stage";
-import { S, clearSel, ui } from "./state";
+import { S, clearSel, selected, setSel, ui } from "./state";
 
 const FONTS = ["Arial", "Arial Black", "Calibri", "Cambria", "Century Gothic", "Courier New", "Georgia", "Segoe UI", "Tahoma", "Times New Roman", "Trebuchet MS", "Verdana"];
 
@@ -227,6 +227,7 @@ export function renderInspector(): void {
   const doc = parseXml(S.deck.texts[S.deck.slides[S.cur]!.path]!);
   const node = S.sel.obj !== null ? collectObjects(doc)[S.sel.obj] : undefined;
   if (!node) { clearSel(); host.appendChild(slideSection()); return; }
+  if (S.multi.length) { multiPanel(host); host.scrollTop = scroll; return; }
   const isTable = node.localName === "graphicFrame" && !!node.getElementsByTagNameNS(A_NS, "tbl")[0];
   const kind = isTable ? "Table" : node.localName === "graphicFrame" ? "Object" : node.localName === "pic" ? "Picture"
     : node.localName === "grpSp" ? "Group" : node.localName === "cxnSp" ? "Line" : kid(node, "txBody") ? "Text box" : "Shape";
@@ -249,6 +250,13 @@ export function renderInspector(): void {
   top.appendChild(head);
   host.appendChild(top);
 
+  if (node.localName === "grpSp") {
+    const sec = el("div", { class: "sect" });
+    const ug = el("button", { class: "btn small", type: "button", style: "width:100%" }, "Ungroup (Ctrl+Shift+G)");
+    ug.addEventListener("click", ungroupSelected);
+    sec.appendChild(ug);
+    host.appendChild(sec);
+  }
   if (isTable) {
     const sec = el("div", { class: "sect" });
     sec.appendChild(el("div", { class: "sect-title" }, "Rows and columns"));
@@ -285,21 +293,85 @@ export function renderInspector(): void {
 }
 
 export function deleteSelected(): void {
-  if (!deleteObj(S.deck, S.cur, S.sel.obj)) return;
+  const n = selected().length;
+  if (!(n > 1 ? deleteObjs(S.deck, S.cur, selected()) : deleteObj(S.deck, S.cur, S.sel.obj))) return;
   clearSel();
   ui.refresh();
-  toast("Deleted");
+  toast(n > 1 ? `Deleted ${n} items` : "Deleted");
 }
 export function duplicateSelected(): void {
+  if (S.multi.length) {
+    const c = copyObjs(S.deck, S.cur, selected());
+    const got = c ? pasteObjs(S.deck, S.cur, c) : [];
+    if (!got.length) return;
+    setSel(got[0]!, got.slice(1));
+    ui.refresh();
+    toast("Duplicated");
+    return;
+  }
   const idx = duplicateObj(S.deck, S.cur, S.sel.obj);
   if (idx === null) return;
-  S.sel = { obj: idx, cell: null };
+  setSel(idx);
   ui.refresh();
   toast("Duplicated");
 }
 function reorder(where: "front" | "back"): void {
   const idx = zOrder(S.deck, S.cur, S.sel.obj, where);
   if (idx === null) return;
-  S.sel = { obj: idx, cell: null };
+  setSel(idx);
   ui.refresh();
+}
+
+export function groupSelected(): void {
+  const idx = groupObjs(S.deck, S.cur, selected());
+  if (idx === null) return;
+  setSel(idx);
+  ui.refresh();
+  toast("Grouped. Ctrl+Shift+G breaks it apart.");
+}
+export function ungroupSelected(): void {
+  const got = ungroupObj(S.deck, S.cur, S.sel.obj);
+  if (!got.length) return;
+  setSel(got[0]!, got.slice(1));
+  ui.refresh();
+  toast("Ungrouped");
+}
+
+const ALIGNS: [Align, string, string][] = [["left", "left", ICON.alignL], ["centre", "centre", ICON.alignC], ["right", "right", ICON.alignR], ["top", "top", ICON.alignT], ["middle", "middle", ICON.alignM], ["bottom", "bottom", ICON.alignB]];
+/** The panel when several things are selected: align, distribute, group. */
+function multiPanel(host: HTMLElement): void {
+  const objs = selected();
+  const top = el("div", { class: "sect" });
+  const head = el("div", { class: "insp-head" });
+  head.appendChild(el("h2", {}, `${objs.length} items`));
+  const tools = el("div", { class: "tools" });
+  for (const [label, icon, fn, danger] of [["Duplicate (Ctrl+D)", ICON.duplicate, duplicateSelected, false], ["Delete (Del)", ICON.trash, deleteSelected, true]] as const) {
+    const b = el("button", { class: "icon-btn small" + (danger ? " danger" : ""), type: "button", title: label, "aria-label": label }, icon);
+    b.addEventListener("click", fn);
+    tools.appendChild(b);
+  }
+  head.appendChild(tools);
+  top.appendChild(head);
+  const grp = el("button", { class: "btn small", type: "button", style: "width:100%" }, "Group (Ctrl+G)");
+  grp.addEventListener("click", groupSelected);
+  top.appendChild(grp);
+  host.appendChild(top);
+
+  const sec = el("div", { class: "sect" });
+  sec.appendChild(el("div", { class: "sect-title" }, "Align to each other"));
+  const al = el("div", { class: "align-grid", role: "group", "aria-label": "Align selected items" });
+  for (const [how, name, icon] of ALIGNS) {
+    const btn = el("button", { class: "icon-btn small", type: "button", title: `Align ${name}`, "aria-label": `Align ${name}` }, icon);
+    btn.addEventListener("click", () => { if (alignObjs(S.deck, S.cur, objs, how)) ui.refresh(); });
+    al.appendChild(btn);
+  }
+  sec.appendChild(al);
+  const dist = el("div", { class: "cols-2", style: "margin-top:8px" });
+  for (const [axis, label] of [["h", "Space across"], ["v", "Space down"]] as const) {
+    const b = el("button", { class: "btn small", type: "button", disabled: objs.length < 3, title: objs.length < 3 ? "Select three or more" : `Equal gaps ${axis === "h" ? "left to right" : "top to bottom"}` }, label);
+    b.addEventListener("click", () => { if (distributeObjs(S.deck, S.cur, objs, axis)) ui.refresh(); });
+    dist.appendChild(b);
+  }
+  sec.append(dist, el("span", { class: "hint" }, "Shift+click to add or remove items. Drag on an empty part of the slide to select by area."));
+  host.appendChild(sec);
 }

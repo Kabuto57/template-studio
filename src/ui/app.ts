@@ -1,14 +1,16 @@
 // Wires the pieces together: views, selection, refresh, keyboard, dialogs.
 import { buildModel } from "../model/fields";
-import { GRID, setBox, type Sel } from "../ooxml/edit";
+import { GRID, moveObjs, setBox, type Sel } from "../ooxml/edit";
+import { collectObjects } from "../ooxml/render";
+import { parseXml } from "../ooxml/xml";
 import { zipSupported } from "../zip/minizip";
 import { $, $$, ICON, el, toast } from "./dom";
-import { deleteSelected, duplicateSelected, renderInspector } from "./inspector";
+import { deleteSelected, duplicateSelected, groupSelected, renderInspector, ungroupSelected } from "./inspector";
 import { renderCodePage, renderTestPanel } from "./outputs";
 import { downloadKit, exampleText, openFile, restoreOrSample, save } from "./project";
 import { renderInsertBar, renderSide } from "./side";
 import { doInsertImage, drawOverlay, renderStage, wireStage } from "./stage";
-import { S, clearSel, ui, type SideTab, type View } from "./state";
+import { S, clearSel, selected, ui, type SideTab, type View } from "./state";
 
 declare const __APP_VERSION__: string;
 const REPO_URL = "https://github.com/Kabuto57/template-studio";
@@ -55,8 +57,9 @@ function setSide(s: SideTab): void {
   renderSide();
 }
 
-function select(sel: Sel, opts: { field?: string | null } = {}): void {
+function select(sel: Sel, opts: { field?: string | null; multi?: number[] } = {}): void {
   S.sel = sel;
+  S.multi = (opts.multi ?? []).filter(i => i !== sel.obj);
   if (opts.field !== undefined) {
     S.selField = opts.field;
     if (opts.field) S.side = "fields";
@@ -121,7 +124,14 @@ function wire(): void {
     const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
     if (mod && key === "z" && !typing) { e.preventDefault(); undoRedo(e.shiftKey ? "redo" : "undo"); return; }
     if (mod && key === "y" && !typing) { e.preventDefault(); undoRedo("redo"); return; }
+    if (!typing && S.view === "design" && mod && key === "a") {
+      e.preventDefault();
+      const n = S.deck.slides[S.cur] ? collectObjects(parseXml(S.deck.texts[S.deck.slides[S.cur]!.path]!)).length : 0;
+      if (n) select({ obj: 0, cell: null }, { multi: [...Array(n).keys()].slice(1) });
+      return;
+    }
     if (typing || S.view !== "design" || S.sel.obj === null) return;
+    if (mod && key === "g") { e.preventDefault(); if (e.shiftKey) ungroupSelected(); else groupSelected(); return; }
     const step = e.shiftKey ? GRID * 10 : GRID;
     if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSelected(); }
     else if (e.key === "Escape") select({ obj: null, cell: null });
@@ -130,7 +140,7 @@ function wire(): void {
       e.preventDefault();
       const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
       const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
-      if (setBox(S.deck, S.cur, S.sel.obj, b => ({ ...b, x: b.x + dx, y: b.y + dy }), "nudge")) refresh();
+      if (S.multi.length ? moveObjs(S.deck, S.cur, selected(), dx, dy, "nudge") : setBox(S.deck, S.cur, S.sel.obj, b => ({ ...b, x: b.x + dx, y: b.y + dy }), "nudge")) refresh();
     }
   });
 }

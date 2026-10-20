@@ -10,7 +10,7 @@ import { fillXml, isSlidePart, newReport, type Data } from "../../src/engine/eng
 import { buildExample, buildModel, buildPrompt, buildSchema, cfgKeyOf, normaliseProject, projectForCode, type Project } from "../../src/model/fields";
 import { buildPython, displayPython, parsePythonFile } from "../../src/model/python";
 import { Deck } from "../../src/ooxml/deck";
-import { BLOCKS, SHAPE_BLOCKS, addBlankSlide, copyObj, insertImage, pasteObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, alignObj, deleteObj, deleteSlide, duplicateObj, duplicateSlide, insertBlock, moveSlide, placeField, renameField, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder } from "../../src/ooxml/edit";
+import { BLOCKS, SHAPE_BLOCKS, addBlankSlide, alignObjs, boundsOf, copyObjs, distributeObjs, groupObjs, insertImage, moveObjs, pasteObjs, ungroupObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, alignObj, deleteObj, deleteSlide, duplicateObj, duplicateSlide, insertBlock, moveSlide, placeField, renameField, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder } from "../../src/ooxml/edit";
 import { collectEditables, collectObjects, renderSlide } from "../../src/ooxml/render";
 import { bytesToB64, b64ToBytes, parseXml } from "../../src/ooxml/xml";
 import { buildDeck } from "../../src/templates/builder";
@@ -371,15 +371,43 @@ describe("shapes, pictures and copy-paste", () => {
     const pic = insertImage(deck, 0, PNG, "png", 1, 1)!;
     expect(objs()[pic]!.localName).toBe("pic");
     expect(deck.texts["[Content_Types].xml"]).toContain('Extension="png"');
-    const clip = copyObj(deck, 0, pic)!;
+    const clip = copyObjs(deck, 0, [pic])!;
     expect(Object.values(clip.media)).toEqual(["ppt/media/image1.png"]);
-    const pasted = pasteObj(deck, 1, clip)!;
+    const [pasted] = pasteObjs(deck, 1, clip) as [number];
     expect(Object.values(deck.relsOf(deck.slides[1]!.path)).some(r => r.target === "ppt/media/image1.png")).toBe(true);
     expect(collectObjects(parseXml(deck.texts[deck.slides[1]!.path]!))[pasted]!.localName).toBe("pic");
 
     const again = await Deck.load(await deck.bytes());
     expect(again.zip.has("ppt/media/image1.png")).toBe(true);
     write("shapes_and_picture.pptx", await deck.bytes());
+  });
+
+  it("aligns, distributes, moves, groups and ungroups several objects", async () => {
+    const deck = await Deck.load(await buildDeck([{ els: [] }], blank));
+    const project = normaliseProject({ name: "Many" });
+    for (const [x, y] of [[1, 1], [4, 3], [9, 2]]) insertBlock(deck, project, 0, "box", { x: x * 914400, y: y * 914400 });
+    const all = [0, 1, 2];
+    const box = (i: number) => boundsOf(deck, 0, [i])!;
+    expect(alignObjs(deck, 0, all, "top")).toBe(true);
+    expect(new Set(all.map(i => box(i).y)).size).toBe(1);
+    expect(distributeObjs(deck, 0, all, "h")).toBe(true);
+    const gap = (a: number, b: number) => box(b).x - box(a).x - box(a).cx;
+    expect(Math.abs(gap(0, 1) - gap(1, 2))).toBeLessThan(2);
+    const before = boundsOf(deck, 0, all)!;
+    expect(moveObjs(deck, 0, all, 914400, 0)).toBe(true);
+    expect(boundsOf(deck, 0, all)!.x).toBe(before.x + 914400);
+
+    const g = groupObjs(deck, 0, [0, 2])!;
+    const objs = () => collectObjects(parseXml(deck.texts[deck.slides[0]!.path]!));
+    expect(objs().length).toBe(2);
+    expect(objs()[g]!.localName).toBe("grpSp");
+    write("grouped.pptx", await deck.bytes());
+    const moved = boundsOf(deck, 0, [g])!;
+    expect(moveObjs(deck, 0, [g], 0, 914400)).toBe(true);
+    const parts = ungroupObj(deck, 0, g);
+    expect(parts.length).toBe(2);
+    expect(objs().length).toBe(3);
+    expect(boundsOf(deck, 0, parts)!.y).toBe(moved.y + 914400); // the move made to the group sticks to its parts
   });
 });
 

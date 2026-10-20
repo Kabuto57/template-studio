@@ -20,6 +20,8 @@ export const S = {
   side: "templates" as SideTab,
   cur: 0,
   sel: { obj: null, cell: null } as Sel,
+  /** Other objects selected along with sel.obj (Shift+click or drag a box around them). */
+  multi: [] as number[],
   selField: null as string | null,
   jsonView: "example" as "example" | "schema",
   py: { key: "", code: "", b64: "" },
@@ -37,9 +39,13 @@ export const ui = {
   /** Settings changed (not the template): regenerate example data and autosave. */
   settingsChanged: (): void => {},
   save: (): void => {},
-  select: (_sel: Sel, _opts?: { field?: string | null }): void => {},
+  select: (_sel: Sel, _opts?: { field?: string | null; multi?: number[] }): void => {},
   setView: (_v: View): void => {},
   setSide: (_s: SideTab): void => {},
 };
 
-export const clearSel = (): void => { S.sel = { obj: null, cell: null }; };
+export const clearSel = (): void => { S.sel = { obj: null, cell: null }; S.multi = []; };
+/** Select one object, plus optionally others with it. */
+export const setSel = (obj: number | null, multi: number[] = []): void => { S.sel = { obj, cell: null }; S.multi = multi.filter(i => i !== obj); };
+/** Every selected object, the main one first. */
+export const selected = (): number[] => (S.sel.obj === null ? [] : [S.sel.obj, ...S.multi]);
