@@ -167,7 +167,7 @@ function elementsPanel(): HTMLElement {
 let openPop: HTMLElement | null = null;
 function closePop(): void { openPop?.remove(); openPop = null; }
 /** A dropdown under a ribbon button, like PowerPoint's Shapes gallery. */
-function popover(anchor: HTMLElement, fill: (pop: HTMLElement) => void): void {
+export function popover(anchor: HTMLElement, fill: (pop: HTMLElement) => void): void {
   const was = openPop?.dataset.for === anchor.id;
   closePop();
   if (was) return;
@@ -175,9 +175,10 @@ function popover(anchor: HTMLElement, fill: (pop: HTMLElement) => void): void {
   fill(pop);
   pop.addEventListener("click", e => { if ((e.target as Element).closest("button")) closePop(); });
   const r = anchor.getBoundingClientRect();
-  pop.style.top = `${r.bottom + 6}px`;
-  pop.style.left = `${Math.max(8, Math.min(r.left, innerWidth - 340))}px`;
   document.body.appendChild(pop);
+  // open below the button, or above it when there is no room (the filmstrip sits at the bottom)
+  pop.style.top = `${r.bottom + 6 + pop.offsetHeight > innerHeight ? Math.max(8, r.top - 6 - pop.offsetHeight) : r.bottom + 6}px`;
+  pop.style.left = `${Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 8))}px`;
   openPop = pop;
   (pop.querySelector("button") as HTMLElement | null)?.focus();
 }
@@ -213,7 +214,7 @@ export function renderInsertBar(): void {
     pop.appendChild(g);
   }), undefined, true);
   group("Draw", shapes, blockBtn("line"));
-  document.addEventListener("pointerdown", e => { if (openPop && !(e.target as Element).closest(".ins-pop, .ins-btn.more")) closePop(); });
+  document.addEventListener("pointerdown", e => { if (openPop && !(e.target as Element).closest(".ins-pop, .ins-btn.more, [aria-haspopup]")) closePop(); });
   document.addEventListener("keydown", e => { if (e.key === "Escape" && openPop) { const a = document.getElementById(openPop.dataset.for!); closePop(); a?.focus(); } });
   document.addEventListener("dragstart", closePop);
 }

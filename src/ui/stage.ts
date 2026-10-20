@@ -1,10 +1,12 @@
 // The slide in the middle and the filmstrip under it: drawing, selection, move/resize,
 // and drops from the Elements and Fields panels.
 import { fillXml, isSlidePart, newReport, parseContent, type Data, type Report } from "../engine/engine";
-import { BLOCKS, addBlankSlide, boundsOf, copyObjs, deleteObjs, insertImage, moveObjs, pasteObjs, type Clip, blockDef, blockSize, deleteSlide, duplicateSlide, inches, insertBlock, moveSlide, placeField, readBox, resizeBox, setBox, snap, type BlockType, type FieldPayload, type Rect } from "../ooxml/edit";
+import { BLOCKS, LAYOUTS, addLayoutSlide, type LayoutDef, boundsOf, copyObjs, deleteObjs, insertImage, moveObjs, pasteObjs, type Clip, blockDef, blockSize, deleteSlide, duplicateSlide, inches, insertBlock, moveSlide, placeField, readBox, resizeBox, setBox, snap, type BlockType, type FieldPayload, type Rect } from "../ooxml/edit";
 import { collectObjects, fitPlaceholderBoxes, renderSlide } from "../ooxml/render";
 import { esc, parseXml } from "../ooxml/xml";
 import { $, ICON, el, toast } from "./dom";
+import { openContextMenu } from "./inspector";
+import { popover } from "./side";
 import { S, clearSel, selected, setSel, ui } from "./state";
 
 /* ---------------------------------------------------------------- filling for the Test view */
@@ -90,17 +92,38 @@ function renderFilm(filled: Record<string, string> | null): void {
     film.appendChild(b);
   });
   if (design) {
-    const add = el("button", { type: "button", class: "add-slide" }, "Add slide");
-    add.addEventListener("click", () => {
-      try { S.cur = addBlankSlide(deck, S.cur); clearSel(); ui.refresh(); toast("Slide added"); }
-      catch (e) { toast((e as Error).message); }
-    });
+    const add: HTMLElement = el("button", { type: "button", class: "add-slide", id: "addSlideBtn", "aria-haspopup": "dialog", title: "Add a slide" }, 'Add slide <i class="caret"></i>');
+    add.addEventListener("click", () => popover(add, pop => {
+      pop.appendChild(el("div", { class: "sect-title" }, "New slide"));
+      const g = el("div", { class: "layouts" });
+      for (const l of LAYOUTS) {
+        const b = el("button", { type: "button", class: "layout-btn", "data-layout": l.id }, `${layoutArt(l)}<span>${l.label}</span>`);
+        b.addEventListener("click", () => {
+          try { S.cur = addLayoutSlide(deck, S.project, S.cur, l.id); clearSel(); ui.refresh(); toast(`${l.label} slide added`); }
+          catch (e) { toast((e as Error).message); }
+        });
+        g.appendChild(b);
+      }
+      pop.appendChild(g);
+    }));
     film.appendChild(add);
   }
   requestAnimationFrame(() => {
     film.querySelectorAll<HTMLElement>(".thumb .slide").forEach(fitPlaceholderBoxes);
     film.querySelector('.thumb[aria-current="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
   });
+}
+
+/** A thumbnail of a layout: dark bars for titles, yellow for fields, grey for panels. */
+function layoutArt(l: LayoutDef): string {
+  const colour = (t: string) => t === "title" || t === "label" ? "#41465C" : t === "box" ? "#D5DAE3" : t === "line" ? "#41465C" : "#F2A300";
+  const parts = l.parts.map(([t, x, y, w, h]) => {
+    const hh = t === "title" ? Math.min(h, 0.55) : t === "text" || t === "bullets" ? Math.min(h, 0.3) : h;
+    const lines = (t === "text" || t === "bullets") ? [0, 0.55, 1.1].filter(o => o + 0.3 <= h).map(o => `<rect x="${x}" y="${y + o}" width="${w * (o ? 0.8 : 1)}" height="${hh}" rx=".12" fill="${colour(t)}" opacity="${o ? 0.6 : 1}"/>`).join("")
+      : `<rect x="${x}" y="${y}" width="${w}" height="${Math.max(hh, 0.08)}" rx=".12" fill="${colour(t)}"/>`;
+    return lines;
+  }).join("");
+  return `<svg viewBox="0 0 13.333 7.5" aria-hidden="true"><rect width="13.333" height="7.5" fill="#fff"/>${parts}</svg>`;
 }
 
 function slideAction(act: string, i: number): void {
@@ -468,6 +491,17 @@ export function wireStage(openFile: (f: File) => void): void {
     const f = [...(e.clipboardData?.files ?? [])].find(x => x.type.startsWith("image/"));
     if (f) { e.preventDefault(); void doInsertImage(f); }
     else if (e.clipboardData?.getData("text/plain") === CLIP_MARK && pasteClip()) e.preventDefault();
+  });
+  $("#slideHost").addEventListener("contextmenu", e => {
+    if (S.view !== "design") return;
+    const slide = document.getElementById("mainSlide");
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    if (!slide || !hit || !slide.contains(hit)) return;
+    e.preventDefault();
+    const obj = hit.closest<HTMLElement>("[data-obj]");
+    if (obj && !selected().includes(+obj.dataset.obj!)) ui.select({ obj: +obj.dataset.obj!, cell: null });
+    if (!obj) ui.select({ obj: null, cell: null });
+    openContextMenu(e.clientX, e.clientY, { copy: copySelected, paste: pasteClip, canPaste: !!clip });
   });
   let resizeTimer: ReturnType<typeof setTimeout>;
   window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (S.view === "design") drawOverlay(); }, 100); });

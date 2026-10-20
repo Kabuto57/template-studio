@@ -380,3 +380,14 @@ table.io th { font-weight: 600; color: var(--muted); font-size: var(--fs-xs); }
 .slide svg, .shape-btn svg, .ins-btn svg { stroke: none; }
 .check { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); cursor: pointer; margin-top: 8px; }
 .seg sup { font-size: 9px; }
+.ctx-menu { position: fixed; z-index: 60; min-width: 220px; padding: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px rgba(20, 23, 42, .18); }
+.ctx-menu button { display: flex; justify-content: space-between; gap: 16px; width: 100%; padding: 7px 10px; border: 0; border-radius: 6px; background: none; color: var(--ink); font: inherit; font-size: var(--fs-sm); text-align: left; cursor: pointer; }
+.ctx-menu button:hover:not([disabled]), .ctx-menu button:focus-visible { background: var(--primary-soft); outline: none; }
+.ctx-menu button[disabled] { color: var(--line-2); cursor: default; }
+.ctx-menu kbd { font: inherit; color: var(--muted); }
+.ctx-menu button[disabled] kbd { color: var(--line-2); }
+.ctx-sep { height: 1px; margin: 4px 6px; background: var(--line); }
+.layouts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.layout-btn { display: flex; flex-direction: column; gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font: inherit; font-size: var(--fs-xs); color: var(--ink); cursor: pointer; text-align: left; }
+.layout-btn svg { stroke: none; width: 100%; height: auto; border-radius: 4px; border: 1px solid var(--line); }
+.layout-btn:hover, .layout-btn:focus-visible { border-color: var(--primary); outline: none; }

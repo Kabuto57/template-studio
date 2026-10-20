@@ -168,15 +168,29 @@ export const BLOCKS: BlockDef[] = [
 export const SHAPE_BLOCKS: BlockDef[] = SHAPES.map(s => ({ type: `shape:${s.geom}`, label: s.label, w: s.w, h: s.h, hint: "A shape" }));
 export const blockDef = (t: string): BlockDef | undefined => BLOCKS.find(b => b.type === t) ?? SHAPE_BLOCKS.find(b => b.type === t);
 
-/** The template's own accent: its most used colour that isn't white, black or grey. New shapes take it. */
-export function accentOf(deck: Deck): string {
-  const count = new Map<string, number>();
-  for (const sl of deck.slides) for (const m of (deck.texts[sl.path] ?? "").matchAll(/<a:srgbClr val="([0-9A-Fa-f]{6})"/g)) {
-    const c = m[1]!.toUpperCase(), [r, g, b] = [0, 2, 4].map(i => parseInt(c.slice(i, i + 2), 16)) as [number, number, number];
-    if (Math.max(r, g, b) - Math.min(r, g, b) > 60) count.set(c, (count.get(c) ?? 0) + 1);
+/** The template's own look, read from its slides, so new elements fit in. */
+export interface Look { accent: string; ink: string; muted: string; panel: string; font?: string }
+export function lookOf(deck: Deck): Look {
+  const count = new Map<string, number>(), fonts = new Map<string, number>();
+  for (const sl of deck.slides) {
+    const xml = deck.texts[sl.path] ?? "";
+    for (const m of xml.matchAll(/<a:srgbClr val="([0-9A-Fa-f]{6})"/g)) { const c = m[1]!.toUpperCase(); count.set(c, (count.get(c) ?? 0) + 1); }
+    for (const m of xml.matchAll(/<a:latin typeface="([^"+][^"]*)"/g)) fonts.set(m[1]!, (fonts.get(m[1]!) ?? 0) + 1);
   }
-  return [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "2B6CB0";
+  const ranked = [...count.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]);
+  const rgb = (c: string) => [0, 2, 4].map(i => parseInt(c.slice(i, i + 2), 16)) as [number, number, number];
+  const sat = (c: string) => { const v = rgb(c); return Math.max(...v) - Math.min(...v); };
+  const lum = (c: string) => { const [r, g, b] = rgb(c); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
+  const pick = (ok: (c: string) => boolean, fallback: string) => ranked.find(ok) ?? fallback;
+  return {
+    accent: pick(c => sat(c) > 60, "2B6CB0"),
+    ink: pick(c => lum(c) < 0.3, "16253D"),
+    muted: pick(c => lum(c) >= 0.3 && lum(c) < 0.6 && sat(c) < 40, "5F6B7A"),
+    panel: pick(c => lum(c) > 0.88 && lum(c) < 0.99, "EEF2F5"),
+    font: [...fonts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0],
+  };
 }
+export const accentOf = (deck: Deck): string => lookOf(deck).accent;
 export function blockSize(deck: Deck, def: BlockDef): { cx: number; cy: number } {
   return { cx: snap(Math.min(def.w * IN, deck.W - 0.4 * IN)), cy: Math.max(GRID, snap(Math.min(def.h * IN, deck.H - 0.4 * IN))) };
 }
@@ -209,13 +223,13 @@ function blockXml(deck: Deck, project: Project, type: BlockType, id: number, box
   const def = blockDef(type)!;
   const key = def.base ? uniqueKey(deck, project, def.base) : "";
   const field = `{{${key}}}`;
-  const NAVY = "16253D", ACC = accentOf(deck);
+  const look = lookOf(deck), NAVY = look.ink, ACC = look.accent, MUTED = look.muted, font = look.font;
   if (type.startsWith("shape:")) return { note: "", xml: shapeXml({ id, name: `${def.label} ${id}`, box, fill: ACC, geom: type.slice(6) }) };
   switch (type) {
-    case "title": return { note: field, xml: shapeXml({ id, name: `Title ${id}`, box, paras: [{ text: field, sz: 32, b: true, color: NAVY }] }) };
-    case "subtitle": return { note: field, xml: shapeXml({ id, name: `Subtitle ${id}`, box, paras: [{ text: field, sz: 20, color: "5F6B7A" }] }) };
-    case "text": return { note: field, xml: shapeXml({ id, name: `Text ${id}`, box, paras: [{ text: field, sz: 16 }] }) };
-    case "quote": return { note: field, xml: shapeXml({ id, name: `Quote ${id}`, box, paras: [{ text: `\u201C${field}\u201D`, sz: 24, i: true, color: NAVY }] }) };
+    case "title": return { note: field, xml: shapeXml({ id, name: `Title ${id}`, box, paras: [{ text: field, sz: 32, b: true, color: NAVY, font }] }) };
+    case "subtitle": return { note: field, xml: shapeXml({ id, name: `Subtitle ${id}`, box, paras: [{ text: field, sz: 20, color: MUTED, font }] }) };
+    case "text": return { note: field, xml: shapeXml({ id, name: `Text ${id}`, box, paras: [{ text: field, sz: 16, color: NAVY, font }] }) };
+    case "quote": return { note: field, xml: shapeXml({ id, name: `Quote ${id}`, box, paras: [{ text: `\u201C${field}\u201D`, sz: 24, i: true, color: NAVY, font }] }) };
     case "callout": return { note: field, xml: shapeXml({ id, name: `Callout ${id}`, box, fill: ACC, geom: "roundRect", radius: 6000, ins: 182880, anchor: "ctr", txBox: false,
       paras: [{ text: field, sz: 16, b: true, color: "FFFFFF" }] }) };
     case "tag": return { note: "", xml: shapeXml({ id, name: `Tag ${id}`, box, fill: ACC, geom: "roundRect", radius: 50000, anchor: "ctr", txBox: false,
@@ -223,17 +237,18 @@ function blockXml(deck: Deck, project: Project, type: BlockType, id: number, box
     case "frame": return { note: "", xml: shapeXml({ id, name: `Frame ${id}`, box, line: ACC, lineW: 19050 }) };
     case "bullets":
       (project.fields[key] ??= {}).type = "list";
-      return { note: field, xml: shapeXml({ id, name: `Bullets ${id}`, box, paras: [{ text: field, sz: 16, bullet: true }] }) };
+      return { note: field, xml: shapeXml({ id, name: `Bullets ${id}`, box, paras: [{ text: field, sz: 16, bullet: true, color: NAVY, font }] }) };
     case "number":
-      return { note: field, xml: shapeXml({ id, name: `Number ${id}`, box, geom: "roundRect", fill: "EEF2F5", ins: 137160, anchor: "ctr", txBox: false,
-        paras: [{ text: field, sz: 36, b: true, color: "2A7F8F" }, { text: "Label", sz: 12, color: "5F6B7A" }] }) };
+      return { note: field, xml: shapeXml({ id, name: `Number ${id}`, box, geom: "roundRect", fill: look.panel, ins: 137160, anchor: "ctr", txBox: false,
+        paras: [{ text: field, sz: 36, b: true, color: ACC, font }, { text: "Label", sz: 12, color: MUTED, font }] }) };
     case "table":
       return { note: `a list called ${key} (3 rows)`, xml: tableXml({ id, name: `Table ${id}`, box, list: key, rows: 3,
+        head: { fill: NAVY, color: "FFFFFF", font, sz: 12, b: true }, body: { font, color: NAVY },
         cols: [{ key: "name", label: "Name" }, { key: "detail", label: "Detail" }, { key: "status", label: "Status" }] }) };
-    case "label": return { note: "", xml: shapeXml({ id, name: `Label ${id}`, box, paras: [{ text: "Label", sz: 14, b: true, color: NAVY }] }) };
+    case "label": return { note: "", xml: shapeXml({ id, name: `Label ${id}`, box, paras: [{ text: "Label", sz: 14, b: true, color: NAVY, font }] }) };
     case "circle": return { note: "", xml: shapeXml({ id, name: `Circle ${id}`, box, fill: "D7E3F4", geom: "ellipse" }) };
     case "line": return { note: "", xml: shapeXml({ id, name: `Divider ${id}`, box, fill: "C5CCD6" }) };
-    default: return { note: "", xml: shapeXml({ id, name: `Box ${id}`, box, fill: "E8EEF4", geom: "roundRect" }) };
+    default: return { note: "", xml: shapeXml({ id, name: `Box ${id}`, box, fill: look.panel, geom: "roundRect" }) };
   }
 }
 
@@ -321,6 +336,39 @@ export function addBlankSlide(deck: Deck, after: number): number {
   const layout = deck.slides[after]?.layout ?? Object.keys(deck.texts).find(p => /^ppt\/slideLayouts\/slideLayout\d+\.xml$/.test(p));
   if (!layout) throw new Error("This template has no slide layout to base a new slide on.");
   addSlideAt(deck, after + 1, blankSlideXml(), layoutRelsXml(layout));
+  return after + 1;
+}
+
+/** Ready-made slide layouts, as blocks placed on a 13.333 x 7.5 in slide (scaled to other sizes). */
+export interface LayoutDef { id: string; label: string; parts: [BlockType, number, number, number, number][] }
+const TITLE: LayoutDef["parts"][number] = ["title", 0.9, 0.6, 11.5, 0.9];
+export const LAYOUTS: LayoutDef[] = [
+  { id: "blank", label: "Blank", parts: [] },
+  { id: "cover", label: "Title slide", parts: [["title", 0.9, 2.5, 11.5, 1.3], ["subtitle", 0.9, 3.95, 11.5, 0.6]] },
+  { id: "text", label: "Title and text", parts: [TITLE, ["text", 0.9, 1.8, 11.5, 4.8]] },
+  { id: "bullets", label: "Title and bullets", parts: [TITLE, ["bullets", 0.9, 1.8, 11.5, 4.8]] },
+  { id: "two", label: "Two columns", parts: [TITLE, ["label", 0.9, 1.8, 5.5, 0.45], ["text", 0.9, 2.4, 5.5, 4.2], ["label", 6.9, 1.8, 5.5, 0.45], ["text", 6.9, 2.4, 5.5, 4.2]] },
+  { id: "table", label: "Title and table", parts: [TITLE, ["table", 0.9, 1.8, 11.5, 2.4]] },
+  { id: "numbers", label: "Three numbers", parts: [TITLE, ["number", 0.9, 1.9, 3.6, 1.8], ["number", 4.85, 1.9, 3.6, 1.8], ["number", 8.8, 1.9, 3.6, 1.8], ["text", 0.9, 4.2, 11.5, 2.3]] },
+  { id: "picture", label: "Text and picture", parts: [TITLE, ["text", 0.9, 1.8, 5.5, 4.8], ["box", 6.9, 1.8, 5.5, 4.8]] },
+  { id: "section", label: "Section", parts: [["title", 0.9, 2.9, 11.5, 1.2], ["line", 0.9, 4.3, 2, 0.06]] },
+  { id: "quote", label: "Quote", parts: [["quote", 1.5, 2.3, 10.3, 2.2], ["subtitle", 1.5, 4.7, 10.3, 0.6]] },
+];
+/** Add a slide after `after` built from a layout, as one undo step. Returns its index. */
+export function addLayoutSlide(deck: Deck, project: Project, after: number, layoutId: string): number {
+  const def = LAYOUTS.find(l => l.id === layoutId);
+  const layout = deck.slides[after]?.layout ?? Object.keys(deck.texts).find(p => /^ppt\/slideLayouts\/slideLayout\d+\.xml$/.test(p));
+  if (!layout) throw new Error("This template has no slide layout to base a new slide on.");
+  const kx = deck.W / (13.333 * IN), ky = deck.H / (7.5 * IN);
+  const pending = project.pending ? [...project.pending] : undefined;
+  const xml = (def?.parts ?? []).map(([type, x, y, w, h], i) => {
+    const made = blockXml(deck, project, type, i + 2, { x: snap(x * IN * kx), y: snap(y * IN * ky), cx: snap(w * IN * kx), cy: Math.max(GRID, snap(h * IN * ky)) });
+    // keep field names unique within the new slide too: park each one until the slide exists
+    for (const m of made.xml.matchAll(/\{\{\s*([A-Za-z0-9_-]+)/g)) (project.pending ??= []).push(m[1]!);
+    return made.xml;
+  }).join("");
+  if (pending) project.pending = pending; else delete project.pending;
+  addSlideAt(deck, after + 1, blankSlideXml(xml), layoutRelsXml(layout));
   return after + 1;
 }
 

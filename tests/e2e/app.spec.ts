@@ -112,7 +112,11 @@ test("build a template from blank, test it, get the code, and come back to it", 
 
   // slides: add, duplicate, delete, then undo the delete
   await page.click(".add-slide");
+  await page.click(".ins-pop [data-layout=two]");
   expect(await slideCount(page)).toBe(2);
+  const keys = await fieldKeys(page);
+  expect(keys.length).toBe(3); // a title and two columns, each with its own field
+  expect(new Set(keys).size).toBe(3);
   await page.locator("#film .thumb").first().hover();
   await page.locator('#film .thumb [data-act="dup"]').first().click();
   expect(await slideCount(page)).toBe(3);

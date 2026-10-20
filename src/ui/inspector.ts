@@ -442,3 +442,49 @@ export function toggleStyle(k: "b" | "i" | "u"): boolean {
   if (setStyle(S.deck, S.cur, S.sel, { [k]: !readStyle(node)[k] })) ui.refresh();
   return true;
 }
+
+/* ---------------------------------------------------------------- right-click menu */
+let menu: HTMLElement | null = null;
+const closeMenu = (): void => { menu?.remove(); menu = null; };
+/** Cut, copy, paste, arrange and group from a right-click on the slide. */
+export function openContextMenu(x: number, y: number, actions: { copy: () => boolean; paste: () => boolean; canPaste: boolean }): void {
+  closeMenu();
+  const has = S.sel.obj !== null, many = S.multi.length > 0;
+  const info = S.deck.slides[S.cur];
+  const node = has && info ? collectObjects(parseXml(S.deck.texts[info.path]!))[S.sel.obj!] : undefined;
+  const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? "\u2318" : "Ctrl+";
+  const items: ([string, string, () => void, boolean] | null)[] = [
+    ["Cut", `${mod}X`, () => { if (actions.copy()) deleteSelected(); }, has],
+    ["Copy", `${mod}C`, () => { actions.copy(); }, has],
+    ["Paste", `${mod}V`, () => { actions.paste(); }, actions.canPaste],
+    ["Duplicate", `${mod}D`, duplicateSelected, has],
+    ["Delete", "Del", deleteSelected, has],
+    null,
+    ["Bring to front", "", () => reorder("front"), has && !many],
+    ["Send to back", "", () => reorder("back"), has && !many],
+    null,
+    ["Group", `${mod}G`, groupSelected, many],
+    ["Ungroup", `${mod}\u21E7G`, ungroupSelected, node?.localName === "grpSp" && !many],
+  ];
+  menu = el("div", { class: "ctx-menu", role: "menu" });
+  for (const it of items) {
+    if (!it) { menu.appendChild(el("div", { class: "ctx-sep", role: "separator" })); continue; }
+    const [label, keys, fn, on] = it;
+    const b = el("button", { type: "button", role: "menuitem", disabled: !on }, `<span>${label}</span><kbd>${keys}</kbd>`);
+    b.addEventListener("click", () => { closeMenu(); fn(); });
+    menu.appendChild(b);
+  }
+  document.body.appendChild(menu);
+  const r = menu.getBoundingClientRect();
+  menu.style.left = `${Math.min(x, innerWidth - r.width - 8)}px`;
+  menu.style.top = `${Math.min(y, innerHeight - r.height - 8)}px`;
+  (menu.querySelector("button:not([disabled])") as HTMLElement | null)?.focus();
+  menu.addEventListener("keydown", e => {
+    const btns = [...menu!.querySelectorAll<HTMLButtonElement>("button:not([disabled])")];
+    const i = btns.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); btns[(i + (e.key === "ArrowDown" ? 1 : -1) + btns.length) % btns.length]?.focus(); }
+    if (e.key === "Escape") { e.stopPropagation(); closeMenu(); }
+  });
+}
+document.addEventListener("pointerdown", e => { if (menu && !(e.target as Element).closest(".ctx-menu")) closeMenu(); });
+window.addEventListener("blur", closeMenu);
