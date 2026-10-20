@@ -224,7 +224,8 @@ button.fgroup-h:hover { color: var(--primary); }
 .stage-bar span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stage-bar #stageMeta { flex: none; font-variant-numeric: tabular-nums; }
 .slide-host { flex: 1; min-height: 0; padding: 14px 28px 22px; display: grid; place-items: center; container-type: size; overflow: hidden; }
-.slide-host > .slide { width: min(100cqw, calc(100cqh * var(--ar, 1.7778))); }
+.slide-host > .slide { width: calc(min(100cqw, calc(100cqh * var(--ar, 1.7778))) * var(--zoom, 1)); flex: none; }
+.slide-host.zoomed { overflow: auto; place-items: safe center; }
 .slide-host > .callout { max-width: 520px; }
 .slide { position: relative; width: 100%; container-type: inline-size; overflow: hidden; background: #fff; color: #000; box-shadow: 0 0 0 1px rgba(20, 23, 42, .06), 0 2px 5px rgba(20, 23, 42, .06), 0 14px 40px rgba(20, 23, 42, .12); touch-action: none; }
 .slide .shp { position: absolute; }
@@ -408,3 +409,6 @@ table.io th { font-weight: 600; color: var(--muted); font-size: var(--fs-xs); }
 .palette input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
 .palette input[type=color]::-webkit-color-swatch { border: 0; border-radius: 50%; }
 .palette input[type=color]::-moz-color-swatch { border: 0; border-radius: 50%; }
+.zoom { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.zoom-val { min-width: 48px; height: 26px; padding: 0 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink-2); font: inherit; font-size: var(--fs-xs); cursor: pointer; font-variant-numeric: tabular-nums; }
+.app:not([data-view="design"]):not([data-view="test"]) .zoom { display: none; }

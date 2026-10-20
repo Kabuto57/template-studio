@@ -96,7 +96,7 @@ function openAbout(keys = false): void {
       ${[["Ctrl+Z / Ctrl+Shift+Z", "Undo / redo"], ["Ctrl+C, X, V", "Copy, cut, paste (also screenshots)"], ["Ctrl+D", "Duplicate"], ["Ctrl+A", "Select everything on the slide"],
         ["Shift+click, or drag a box", "Select several"], ["Ctrl+G / Ctrl+Shift+G", "Group / ungroup"], ["Ctrl+B, I, U", "Bold, italic, underline"],
         ["Arrow keys (Shift for bigger steps)", "Nudge"], ["Alt while dragging", "Place without snapping"], ["Shift while resizing", "Keep proportions"],
-        ["Delete", "Remove"], ["Esc", "Deselect"], ["Right-click", "More actions"], ["?", "This list"]]
+        ["Ctrl+= / Ctrl+- / Ctrl+0", "Zoom in / out / fit"], ["Double-click text", "Type on the slide"], ["Ctrl+Alt+C / Ctrl+Alt+V", "Copy / paste style"], ["Delete", "Remove"], ["Esc", "Deselect"], ["Right-click", "More actions"], ["?", "This list"]]
         .map(([k, v]) => `<dt><kbd>${k}</kbd></dt><dd>${v}</dd>`).join("")}</dl></details>
     <footer><span>Version ${__APP_VERSION__} · <a href="${REPO_URL}" target="_blank" rel="noopener">Source on GitHub</a></span>
     <button class="btn primary" type="button" id="aboutClose">Close</button></footer></div>`;
@@ -105,7 +105,19 @@ function openAbout(keys = false): void {
   d.showModal();
 }
 
+/** Slide zoom, relative to fitting the window: 1 = fit. */
+let zoom = 1;
+const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+function setZoom(dir: -1 | 0 | 1): void {
+  zoom = dir === 0 ? 1 : ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, ZOOMS.indexOf(zoom) + dir))]!;
+  $("#slideHost").style.setProperty("--zoom", String(zoom));
+  $("#slideHost").classList.toggle("zoomed", zoom > 1);
+  $(".zoom-val").textContent = zoom === 1 ? "Fit" : `${Math.round(zoom * 100)}%`;
+  requestAnimationFrame(drawOverlay);
+}
+
 function wire(): void {
+  $$<HTMLElement>(".zoom [data-z]").forEach(b => b.addEventListener("click", () => setZoom(+b.dataset.z! as -1 | 0 | 1)));
   wireStage(f => void openFile(f));
   $$("[data-view][role=tab]").forEach(b => b.addEventListener("click", () => setView(b.dataset.view as View)));
   $$("#rail [data-side]").forEach(b => b.addEventListener("click", () => setSide(b.dataset.side as SideTab, true)));
@@ -136,6 +148,7 @@ function wire(): void {
     const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
     if (mod && key === "z" && !typing) { e.preventDefault(); undoRedo(e.shiftKey ? "redo" : "undo"); return; }
     if (mod && key === "y" && !typing) { e.preventDefault(); undoRedo("redo"); return; }
+    if (mod && !typing && S.view !== "code" && (e.key === "=" || e.key === "+" || e.key === "-" || e.key === "0")) { e.preventDefault(); setZoom(e.key === "0" ? 0 : e.key === "-" ? -1 : 1); return; }
     if (!typing && e.key === "?") { e.preventDefault(); openAbout(true); return; }
     if (!typing && S.view === "design" && mod && key === "a") {
       e.preventDefault();

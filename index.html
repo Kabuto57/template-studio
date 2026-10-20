@@ -66,7 +66,7 @@
 
     <main class="stage" id="stage" tabindex="-1" aria-label="Slide">
       <div class="insert-bar" id="insertBar" role="toolbar" aria-label="Insert"></div>
-      <div class="stage-bar"><span id="stageHint"></span><span id="stageMeta"></span><button class="btn small primary" id="nextBtn" type="button"></button></div>
+      <div class="stage-bar"><span id="stageHint"></span><span id="stageMeta"></span><span class="zoom" role="group" aria-label="Zoom"><button type="button" class="icon-btn small" data-z="-1" title="Zoom out (Ctrl+-)" aria-label="Zoom out">&minus;</button><button type="button" class="zoom-val" data-z="0" title="Fit to window (Ctrl+0)" aria-label="Fit to window">Fit</button><button type="button" class="icon-btn small" data-z="1" title="Zoom in (Ctrl+=)" aria-label="Zoom in">+</button></span><button class="btn small primary" id="nextBtn" type="button"></button></div>
       <div class="slide-host" id="slideHost"></div>
       <div class="film" id="film" aria-label="Slides"></div>
     </main>
