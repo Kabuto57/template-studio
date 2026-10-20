@@ -252,6 +252,9 @@ export function renderInsertBar(): void {
     pop.appendChild(g);
   }), undefined, true);
   group("Draw", shapes, blockBtn("arrow"), blockBtn("line"));
+  const fmt = el("div", { class: "ins-group fmt off", role: "group", "aria-label": "Format", id: "fmtGroup" });
+  fmt.append(el("div", { class: "ins-row" }), el("span", { class: "ins-name" }, "Format: select some text"));
+  bar.appendChild(fmt);
   document.addEventListener("pointerdown", e => { if (openPop && !(e.target as Element).closest(".ins-pop, .ins-btn.more, [aria-haspopup]")) closePop(); });
   document.addEventListener("keydown", e => { if (e.key === "Escape" && openPop) { const a = document.getElementById(openPop.dataset.for!); closePop(); a?.focus(); } });
   document.addEventListener("dragstart", closePop);

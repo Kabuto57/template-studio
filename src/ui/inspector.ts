@@ -10,7 +10,7 @@ import { fieldEditor } from "./fields";
 import { doPlaceField, prepareImage } from "./stage";
 import { S, clearSel, selected, setSel, ui } from "./state";
 
-const FONTS = ["Arial", "Arial Black", "Calibri", "Cambria", "Century Gothic", "Courier New", "Georgia", "Segoe UI", "Tahoma", "Times New Roman", "Trebuchet MS", "Verdana"];
+export const FONTS = ["Arial", "Arial Black", "Calibri", "Cambria", "Century Gothic", "Courier New", "Georgia", "Segoe UI", "Tahoma", "Times New Roman", "Trebuchet MS", "Verdana"];
 
 /** The colours the template already uses, most frequent first: the natural palette to offer. */
 function templateColours(): string[] {
@@ -352,7 +352,48 @@ function slideSection(): HTMLElement {
   return wrap;
 }
 
+/** The Format group on the ribbon: quick font, size, emphasis and alignment for the selected text. */
+export function renderFormatBar(): void {
+  const g = document.getElementById("fmtGroup");
+  if (!g) return;
+  const info = S.deck.slides[S.cur];
+  const doc = info ? parseXml(S.deck.texts[info.path]!) : null;
+  const node = doc && S.sel.obj !== null && !S.multi.length ? selTextNode(doc, S.sel) : null;
+  const st = node ? readStyle(node) : null;
+  const row = g.querySelector<HTMLElement>(".ins-row")!;
+  if (row.dataset.ready !== "1") {
+    row.dataset.ready = "1";
+    row.innerHTML = `<select class="inp fmt-font" aria-label="Font (ribbon)"><option value="">Template font</option>${FONTS.map(f => `<option>${esc(f)}</option>`).join("")}</select>` +
+      `<input class="inp fmt-size" type="number" min="6" max="200" aria-label="Font size (ribbon)">` +
+      `<span class="seg">${[["b", "<b>B</b>", "Bold"], ["i", "<i>I</i>", "Italic"], ["u", "<u>U</u>", "Underline"]].map(([k, h, n]) => `<button type="button" data-k="${k}" aria-label="${n} (ribbon)" title="${n}">${h}</button>`).join("")}</span>` +
+      `<span class="seg">${([["l", "Left", ICON.textL], ["ctr", "Centre", ICON.textC], ["r", "Right", ICON.textR]] as const).map(([a, n, ic]) => `<button type="button" data-a="${a}" aria-label="Align ${n.toLowerCase()} (ribbon)" title="${n}">${ic}</button>`).join("")}</span>` +
+      `<input class="fmt-colour" type="color" aria-label="Text colour (ribbon)" title="Text colour">`;
+    const apply = (st: TextStyle) => { if (setStyle(S.deck, S.cur, S.sel, st)) ui.refresh(); };
+    row.querySelector<HTMLSelectElement>(".fmt-font")!.addEventListener("change", e => apply({ font: (e.target as HTMLSelectElement).value }));
+    row.querySelector<HTMLInputElement>(".fmt-size")!.addEventListener("change", e => { const v = +(e.target as HTMLInputElement).value; if (v >= 6) apply({ sz: Math.min(200, v) }); });
+    row.querySelector<HTMLInputElement>(".fmt-colour")!.addEventListener("change", e => apply({ color: (e.target as HTMLInputElement).value.slice(1).toUpperCase() }));
+    row.addEventListener("click", e => {
+      const b = (e.target as Element).closest<HTMLElement>("button");
+      if (!b) return;
+      if (b.dataset.k) apply({ [b.dataset.k]: b.getAttribute("aria-pressed") !== "true" });
+      if (b.dataset.a) apply({ algn: b.dataset.a });
+    });
+  }
+  g.classList.toggle("off", !st);
+  g.querySelector(".ins-name")!.textContent = st ? "Format" : "Format: select some text";
+  row.querySelectorAll<HTMLElement>("select, input, button").forEach(x => { (x as HTMLButtonElement).disabled = !st; });
+  if (!st) return;
+  const font = row.querySelector<HTMLSelectElement>(".fmt-font")!;
+  if (st.font && ![...font.options].some(o => o.value === st.font)) font.appendChild(el("option", {}, esc(st.font)));
+  font.value = st.font;
+  row.querySelector<HTMLInputElement>(".fmt-size")!.value = String(Math.round(st.sz));
+  row.querySelector<HTMLInputElement>(".fmt-colour")!.value = `#${st.color}`;
+  row.querySelectorAll<HTMLElement>("[data-k]").forEach(b => b.setAttribute("aria-pressed", String(st[b.dataset.k as "b" | "i" | "u"])));
+  row.querySelectorAll<HTMLElement>("[data-a]").forEach(b => b.setAttribute("aria-pressed", String(st.algn === b.dataset.a)));
+}
+
 export function renderInspector(): void {
+  renderFormatBar();
   const host = $("#insp");
   if (S.view !== "design") return;
   const active = document.activeElement as HTMLTextAreaElement | null;

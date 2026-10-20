@@ -50,7 +50,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
 /* ------------------------------------------------------------------ shell */
 .app {
   height: 100dvh; display: grid;
-  grid-template: "top top top top" var(--top) "rail side stage insp" minmax(0, 1fr) / var(--rail-w) var(--side-w) minmax(0, 1fr) var(--insp-w);
+  grid-template: "top top top top" var(--top) "rail ribbon ribbon ribbon" auto "rail side stage insp" minmax(0, 1fr) / var(--rail-w) var(--side-w) minmax(0, 1fr) var(--insp-w);
 }
 .app[data-view="test"] { grid-template: "top top" var(--top) "stage insp" minmax(0, 1fr) / minmax(0, 1fr) 400px; }
 .app[data-view="code"] { grid-template: "top" var(--top) "code" minmax(0, 1fr) / minmax(0, 1fr); }
@@ -208,7 +208,7 @@ button.fgroup-h:hover { color: var(--primary); }
 
 /* ------------------------------------------------------------------ stage */
 .stage { grid-area: stage; min-width: 0; min-height: 0; display: flex; flex-direction: column; outline: none; }
-.insert-bar { display: flex; gap: 4px; padding: 8px 24px; background: var(--panel); border-bottom: 1px solid var(--line); flex: none; overflow-x: auto; }
+.insert-bar { grid-area: ribbon; display: flex; gap: 4px; padding: 6px 16px; background: var(--panel); border-bottom: 1px solid var(--line); overflow-x: auto; min-width: 0; }
 .app:not([data-view="design"]) .insert-bar { display: none; }
 .ins-group { display: flex; flex-direction: column; flex: none; padding: 0 6px; border-right: 1px solid var(--line); }
 .ins-group:first-child { padding-left: 0; }
@@ -348,7 +348,7 @@ table.io th { font-weight: 600; color: var(--muted); font-size: var(--fs-xs); }
   .rail button { flex: 1; min-width: 68px; }
   .rail-gap { display: none; }
   .side, .insp { border: 0; border-top: 1px solid var(--line); overflow: visible; }
-  .side { order: 3; } .stage { order: 2; } .insp { order: 4; }
+  .side { order: 3; } .stage { order: 2; } .insp { order: 4; } .insert-bar { order: 1; }
   .slide-host { container-type: inline-size; padding: 12px; flex: none; min-height: calc((100vw - 24px) * 9 / 16 + 24px); }
   .slide-host > .slide { width: 100%; }
   .stage-bar { padding: 10px 12px 0; }
@@ -420,3 +420,8 @@ table.io th { font-weight: 600; color: var(--muted); font-size: var(--fs-xs); }
 .thumb.dragging { opacity: .4; }
 .thumb.drop-before { box-shadow: -4px 0 0 var(--primary); }
 .thumb.drop-after { box-shadow: 4px 0 0 var(--primary); }
+.ins-group.fmt .ins-row { align-items: center; gap: 6px; height: 46px; }
+.ins-group.fmt .fmt-font { width: 140px; height: 30px; }
+.ins-group.fmt .fmt-size { width: 56px; height: 30px; padding: 0 6px; }
+.ins-group.fmt .fmt-colour { width: 30px; height: 30px; padding: 0; border: 1px solid var(--line-2); border-radius: 6px; background: none; cursor: pointer; }
+.ins-group.fmt.off .ins-row { opacity: .45; }

@@ -194,15 +194,19 @@ test("format a text box: text, style, colour, undo", async ({ page }) => {
   await expect(page.locator("#mainSlide")).toContainText("Quarterly update");
   expect(await fieldKeys(page)).toEqual(["{{author}}"]);
   await expect(page.locator("#inspText")).toBeFocused(); // typing is not interrupted by the redraw
-  await page.getByLabel("Font size").fill("28");
-  await page.getByLabel("Font size").press("Enter");
-  await page.getByLabel("Font", { exact: true }).selectOption("Georgia");
-  await page.getByLabel("Align text centre").click();
+  const insp = page.locator("#insp"); // the ribbon has its own Format controls too
+  await insp.getByLabel("Font size").fill("28");
+  await insp.getByLabel("Font size").press("Enter");
+  await insp.getByLabel("Font", { exact: true }).selectOption("Georgia");
+  await insp.getByLabel("Align text centre").click();
   const span = page.locator("#mainSlide .para span").first();
   await expect(span).toHaveCSS("font-family", /Georgia/);
   await expect(page.locator("#mainSlide .para").first()).toHaveCSS("text-align", "center");
-  await page.getByLabel("Italic").click();
+  await insp.getByLabel("Italic").click();
   await expect(span).toHaveCSS("font-style", "italic");
+  await page.locator("#fmtGroup [data-k=u]").click(); // and the ribbon's Underline
+  await expect(span).toHaveCSS("text-decoration-line", "underline");
+  await expect(page.locator("#fmtGroup .fmt-size")).toHaveValue("28");
   // slide background, then undo it
   await page.keyboard.press("Escape");
   await expect(page.locator("#insp")).toContainText("Nothing selected");
