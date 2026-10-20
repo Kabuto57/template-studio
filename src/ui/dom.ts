@@ -58,6 +58,9 @@ export const safeName = (s: unknown): string =>
 
 /** Inline icons (20 px grid, stroked). */
 export const ICON = {
+  listNone: '<svg viewBox="0 0 20 20"><path d="M4 6h12M4 10h12M4 14h8"/></svg>',
+  listBullet: '<svg viewBox="0 0 20 20"><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="10" r="1" fill="currentColor"/><circle cx="4.5" cy="14" r="1" fill="currentColor"/><path d="M8 6h8M8 10h8M8 14h8"/></svg>',
+  listNumber: '<svg viewBox="0 0 20 20"><path d="M3.5 4.5h1v3M3.5 12.5h2l-2 2h2M8 6h8M8 10h8M8 14h8"/></svg>',
   duplicate: '<svg viewBox="0 0 20 20"><rect x="7" y="7" width="9.5" height="9.5" rx="2"/><path d="M13 4.5H5.5a2 2 0 0 0-2 2V13"/></svg>',
   trash: '<svg viewBox="0 0 20 20"><path d="M4 6h12M8 6V4.5h4V6M6 6l.7 9.5h6.600L14 6M8.5 9v4M11.5 9v4"/></svg>',
   front: '<svg viewBox="0 0 20 20"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5" fill="currentColor" fill-opacity=".18"/><path d="M15 9.5h1.5v7h-7V15"/></svg>',

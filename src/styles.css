@@ -378,3 +378,5 @@ table.io th { font-weight: 600; color: var(--muted); font-size: var(--fs-xs); }
 .slide .guide.h { left: 0; right: 0; height: 1px; }
 .slide .marquee { position: absolute; z-index: 21; pointer-events: none; border: 1px solid var(--primary); background: rgba(43, 80, 237, .08); }
 .slide svg, .shape-btn svg, .ins-btn svg { stroke: none; }
+.check { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); cursor: pointer; margin-top: 8px; }
+.seg sup { font-size: 9px; }

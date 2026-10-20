@@ -612,6 +612,39 @@ export function ungroupObj(deck: Deck, slide: number, obj: number | null): numbe
 const OBJ_TYPES_EDIT = new Set(["sp", "pic", "graphicFrame", "grpSp", "cxnSp"]);
 
 /* ---------------------------------------------------------------- shape look */
+/** How see-through the fill (or picture) is, 0 to 100. */
+export function readOpacity(node: Element): number {
+  if (node.localName === "pic") return num(dig(node, "blipFill", "blip", "alphaModFix")?.getAttribute("amt"), 100000) / 1000;
+  return num(dig(node, "spPr", "solidFill", "srgbClr", "alpha")?.getAttribute("val"), 100000) / 1000;
+}
+export function setOpacity(deck: Deck, slide: number, obj: number | null, pct: number): boolean {
+  const v = String(Math.round(Math.min(100, Math.max(0, pct)) * 1000));
+  return editObj(deck, slide, obj, (node, doc) => {
+    if (node.localName === "pic") {
+      const blip = dig(node, "blipFill", "blip");
+      if (!blip) return false;
+      kid(blip, "alphaModFix")?.remove();
+      if (v !== "100000") { const a = doc.createElementNS(A_NS, "a:alphaModFix"); a.setAttribute("amt", v); blip.insertBefore(a, blip.firstElementChild); }
+      return;
+    }
+    const clr = dig(node, "spPr", "solidFill", "srgbClr");
+    if (!clr) return false;
+    kid(clr, "alpha")?.remove();
+    if (v !== "100000") { const a = doc.createElementNS(A_NS, "a:alpha"); a.setAttribute("val", v); clr.appendChild(a); }
+  }, "opacity");
+}
+export const readShadow = (node: Element): boolean => !!dig(node, node.localName === "grpSp" ? "grpSpPr" : "spPr", "effectLst", "outerShdw");
+/** A soft drop shadow below the object, like PowerPoint's "Offset: Bottom". */
+export function setShadow(deck: Deck, slide: number, obj: number | null, on: boolean): boolean {
+  return editObj(deck, slide, obj, node => {
+    const spPr = kid(node, "spPr");
+    if (!spPr) return false;
+    kid(spPr, "effectLst")?.remove();
+    if (!on) return;
+    const fx = importXml(node.ownerDocument, '<a:effectLst><a:outerShdw blurRad="152400" dist="38100" dir="5400000" algn="t" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="30000"/></a:srgbClr></a:outerShdw></a:effectLst>');
+    spPr.insertBefore(fx, [...spPr.children].find(c => ["scene3d", "sp3d", "extLst"].includes(c.localName)) ?? null);
+  });
+}
 export function readGeom(node: Element): string | null {
   return node.localName === "sp" ? dig(node, "spPr", "prstGeom")?.getAttribute("prst") ?? (dig(node, "spPr", "custGeom") ? null : "rect") : null;
 }
@@ -762,7 +795,33 @@ function setSolid(el: Element, hex: string | null, beforeNames: string[]): void 
   el.insertBefore(f, [...el.children].find(c => beforeNames.includes(c.localName)) ?? null);
 }
 
-export interface TextStyle { sz?: number; b?: boolean; i?: boolean; color?: string; algn?: string; font?: string }
+export type ListKind = "none" | "bullet" | "number";
+export interface TextStyle {
+  sz?: number; b?: boolean; i?: boolean; u?: boolean; strike?: boolean; caps?: boolean; color?: string; algn?: string; font?: string;
+  list?: ListKind; anchor?: "t" | "ctr" | "b"; line?: number;
+}
+/** Paragraph property children that come after bullets, so new bullet elements go before them. */
+const PPR_AFTER_BULLETS = ["tabLst", "defRPr", "extLst"];
+const BULLET_NAMES = ["buClrTx", "buClr", "buSzTx", "buSzPct", "buSzPts", "buFontTx", "buFont", "buNone", "buAutoNum", "buChar", "buBlip"];
+function pPrOf(p: Element): Element {
+  let pPr = kid(p, "pPr");
+  if (!pPr) { pPr = p.ownerDocument.createElementNS(A_NS, "a:pPr"); p.insertBefore(pPr, p.firstElementChild); }
+  return pPr;
+}
+function setList(pPr: Element, kind: ListKind): void {
+  for (const c of [...pPr.children]) if (BULLET_NAMES.includes(c.localName)) c.remove();
+  const doc = pPr.ownerDocument, before = [...pPr.children].find(c => PPR_AFTER_BULLETS.includes(c.localName)) ?? null;
+  const add = (name: string, attrs: Record<string, string>) => {
+    const e = doc.createElementNS(A_NS, `a:${name}`);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    pPr.insertBefore(e, before);
+  };
+  if (kind === "none") { add("buNone", {}); pPr.removeAttribute("marL"); pPr.removeAttribute("indent"); return; }
+  const ind = kind === "number" ? 342900 : 285750;
+  pPr.setAttribute("marL", String(ind)); pPr.setAttribute("indent", String(-ind));
+  add("buFont", { typeface: kind === "number" ? "+mj-lt" : "Arial" });
+  add(kind === "number" ? "buAutoNum" : "buChar", kind === "number" ? { type: "arabicPeriod" } : { char: "\u2022" });
+}
 function applyTextStyle(node: Element, st: TextStyle): void {
   const txBody = kid(node, "txBody");
   if (!txBody) return;
@@ -770,6 +829,9 @@ function applyTextStyle(node: Element, st: TextStyle): void {
     if (st.sz) rp.setAttribute("sz", String(Math.round(st.sz * 100)));
     if (st.b !== undefined) rp.setAttribute("b", st.b ? "1" : "0");
     if (st.i !== undefined) rp.setAttribute("i", st.i ? "1" : "0");
+    if (st.u !== undefined) rp.setAttribute("u", st.u ? "sng" : "none");
+    if (st.strike !== undefined) rp.setAttribute("strike", st.strike ? "sngStrike" : "noStrike");
+    if (st.caps !== undefined) rp.setAttribute("cap", st.caps ? "all" : "none");
     if (st.color) {
       for (const c of [...rp.children]) if (FILL_NAMES.includes(c.localName)) c.remove();
       const f = rp.ownerDocument.createElementNS(A_NS, "a:solidFill");
@@ -794,11 +856,20 @@ function applyTextStyle(node: Element, st: TextStyle): void {
       }
     }
   }
-  if (st.algn) for (const p of kids(txBody, "p")) {
-    let pPr = kid(p, "pPr");
-    if (!pPr) { pPr = p.ownerDocument.createElementNS(A_NS, "a:pPr"); p.insertBefore(pPr, p.firstElementChild); }
-    pPr.setAttribute("algn", st.algn);
+  for (const p of kids(txBody, "p")) {
+    if (!st.algn && !st.list && !st.line) break;
+    const pPr = pPrOf(p);
+    if (st.algn) pPr.setAttribute("algn", st.algn);
+    if (st.list) setList(pPr, st.list);
+    if (st.line) {
+      kid(pPr, "lnSpc")?.remove();
+      const ls = p.ownerDocument.createElementNS(A_NS, "a:lnSpc"), pct = p.ownerDocument.createElementNS(A_NS, "a:spcPct");
+      pct.setAttribute("val", String(Math.round(st.line * 100000)));
+      ls.appendChild(pct);
+      pPr.insertBefore(ls, pPr.firstElementChild);
+    }
   }
+  if (st.anchor) kid(txBody, "bodyPr")?.setAttribute("anchor", st.anchor);
 }
 function applyBoxFill(node: Element, hex: string | null): void {
   if (node.localName === "tc") {
@@ -820,7 +891,7 @@ export function setStyle(deck: Deck, slide: number, sel: Sel, st: TextStyle & { 
   return editText(deck, slide, sel, apply, "style") || editObj(deck, slide, sel.obj, apply, "style");
 }
 
-export interface StyleInfo { sz: number; b: boolean; i: boolean; color: string; fill: string | null; noFill: boolean; algn: string; font: string }
+export interface StyleInfo { sz: number; b: boolean; i: boolean; u: boolean; strike: boolean; caps: boolean; color: string; fill: string | null; noFill: boolean; algn: string; font: string; list: ListKind; anchor: string; line: number }
 export function readStyle(node: Element): StyleInfo {
   const txBody = kid(node, "txBody");
   const rp = txBody ? runPrs(txBody, false)[0] : null;
@@ -836,6 +907,12 @@ export function readStyle(node: Element): StyleInfo {
     noFill: !!kid(fillHost, "noFill"),
     algn: p0?.getAttribute("algn") || "l",
     font: kid(rp, "latin")?.getAttribute("typeface") ?? "",
+    u: !!rp?.getAttribute("u") && rp.getAttribute("u") !== "none",
+    strike: !!rp?.getAttribute("strike") && rp.getAttribute("strike") !== "noStrike",
+    caps: rp?.getAttribute("cap") === "all",
+    list: kid(p0, "buAutoNum") ? "number" : kid(p0, "buChar") ? "bullet" : "none",
+    anchor: kid(txBody, "bodyPr")?.getAttribute("anchor") || "t",
+    line: num(dig(p0, "lnSpc", "spcPct")?.getAttribute("val"), 100000) / 100000,
   };
 }
 

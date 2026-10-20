@@ -1,10 +1,10 @@
 // The panel on the right: format whatever is selected on the slide.
 import { scanPlaceholders } from "../engine/engine";
 import { cfgKeyOf } from "../model/fields";
-import { alignObj, alignObjs, copyObjs, deleteObjs, distributeObjs, groupObjs, pasteObjs, ungroupObj, deleteObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, duplicateObj, inches, IN, readBox, readStyle, selTextNode, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder, type Align, type FieldPayload, type Sel, type TableOp, type TextStyle } from "../ooxml/edit";
+import { readOpacity, readShadow, setOpacity, setShadow, alignObj, alignObjs, copyObjs, deleteObjs, distributeObjs, groupObjs, pasteObjs, ungroupObj, deleteObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, duplicateObj, inches, IN, readBox, readStyle, selTextNode, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder, type Align, type FieldPayload, type Sel, type ListKind, type TableOp, type TextStyle } from "../ooxml/edit";
 import { SHAPES } from "../ooxml/shapes";
 import { collectEditables, collectObjects, paraText } from "../ooxml/render";
-import { A_NS, esc, kid, kids, nodeXml, parseXml } from "../ooxml/xml";
+import { A_NS, dig, esc, kid, kids, nodeXml, parseXml } from "../ooxml/xml";
 import { $, ICON, debounce, el, toast } from "./dom";
 import { fieldEditor } from "./fields";
 import { doPlaceField } from "./stage";
@@ -115,12 +115,20 @@ function styleSection(node: Element, title: string): HTMLElement {
       '<option value="">Template font</option>' + [...new Set([...(st.font ? [st.font] : []), ...FONTS])].map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join(""));
     font.value = st.font;
     font.addEventListener("change", () => apply({ font: font.value }));
-    const size = el("input", { class: "inp", type: "number", min: "6", max: "200", step: "1", value: String(Math.round(st.sz)), "aria-label": "Font size", style: "width:76px;flex:none" });
+    const size = el("input", { class: "inp", type: "number", min: "6", max: "200", step: "1", value: String(Math.round(st.sz)), "aria-label": "Font size", style: "width:60px;flex:none" });
     size.addEventListener("change", () => apply({ sz: Math.min(200, Math.max(6, +size.value || st.sz)) }));
+    // PowerPoint's grow / shrink font steps
+    const STEPS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 54, 60, 66, 72, 80, 88, 96];
+    const step = (dir: 1 | -1) => apply({ sz: dir > 0 ? STEPS.find(v => v > st.sz) ?? Math.min(200, st.sz + 8) : [...STEPS].reverse().find(v => v < st.sz) ?? Math.max(6, st.sz - 1) });
+    const grow = el("div", { class: "seg", role: "group", "aria-label": "Font size steps" },
+      '<button type="button" data-d="-1" aria-label="Smaller text" title="Smaller">A<sup>-</sup></button><button type="button" data-d="1" aria-label="Bigger text" title="Bigger">A<sup>+</sup></button>');
+    grow.addEventListener("click", e => { const b = (e.target as Element).closest<HTMLElement>("[data-d]"); if (b) step(+b.dataset.d! as 1 | -1); });
     const r1 = el("div", { class: "row tight" });
-    r1.append(font, size);
+    r1.append(font, size, grow);
     const emph = el("div", { class: "seg", role: "group", "aria-label": "Emphasis" },
-      `<button type="button" data-k="b" aria-pressed="${st.b}" aria-label="Bold"><b>B</b></button><button type="button" data-k="i" aria-pressed="${st.i}" aria-label="Italic"><i>I</i></button>`);
+      `<button type="button" data-k="b" aria-pressed="${st.b}" aria-label="Bold" title="Bold (Ctrl+B)"><b>B</b></button><button type="button" data-k="i" aria-pressed="${st.i}" aria-label="Italic" title="Italic (Ctrl+I)"><i>I</i></button>` +
+      `<button type="button" data-k="u" aria-pressed="${st.u}" aria-label="Underline" title="Underline (Ctrl+U)"><u>U</u></button><button type="button" data-k="strike" aria-pressed="${st.strike}" aria-label="Strikethrough" title="Strikethrough"><s>S</s></button>` +
+      `<button type="button" data-k="caps" aria-pressed="${st.caps}" aria-label="All capitals" title="All capitals">AA</button>`);
     emph.addEventListener("click", e => {
       const b = (e.target as Element).closest<HTMLElement>("[data-k]");
       if (b) apply({ [b.dataset.k!]: b.getAttribute("aria-pressed") !== "true" });
@@ -133,8 +141,28 @@ function styleSection(node: Element, title: string): HTMLElement {
       if (b) apply({ algn: b.dataset.a });
     });
     const r2 = el("div", { class: "row" });
-    r2.append(emph, algn);
-    sec.append(r1, r2, colourControl("Text colour", st.color, hex => { if (hex) apply({ color: hex }); }));
+    r2.append(emph);
+    const r3 = el("div", { class: "row" });
+    const list = el("div", { class: "seg", role: "group", "aria-label": "List" },
+      ([["none", "No list", ICON.listNone], ["bullet", "Bullets", ICON.listBullet], ["number", "Numbers", ICON.listNumber]] as const)
+        .map(([k, name, icon]) => `<button type="button" data-l="${k}" aria-pressed="${st.list === k}" aria-label="${name}" title="${name}">${icon}</button>`).join(""));
+    list.addEventListener("click", e => { const b = (e.target as Element).closest<HTMLElement>("[data-l]"); if (b) apply({ list: b.dataset.l as ListKind }); });
+    r3.append(algn, list);
+    sec.append(r1, r2, r3);
+    if (node.localName === "sp") {
+      const r4 = el("div", { class: "row" });
+      const va = el("div", { class: "seg", role: "group", "aria-label": "Vertical position" },
+        ([["t", "Top", ICON.alignT], ["ctr", "Middle", ICON.alignM], ["b", "Bottom", ICON.alignB]] as const)
+          .map(([a, name, icon]) => `<button type="button" data-v="${a}" aria-pressed="${st.anchor === a}" aria-label="Text at the ${name.toLowerCase()}" title="Text at the ${name.toLowerCase()}">${icon}</button>`).join(""));
+      va.addEventListener("click", e => { const b = (e.target as Element).closest<HTMLElement>("[data-v]"); if (b) apply({ anchor: b.dataset.v as "t" | "ctr" | "b" }); });
+      const line = el("select", { class: "inp", "aria-label": "Line spacing", title: "Line spacing", style: "width:auto;flex:1" },
+        [1, 1.15, 1.5, 2].map(v => `<option value="${v}">Line spacing ${v}</option>`).join(""));
+      line.value = String([1, 1.15, 1.5, 2].reduce((a, b) => Math.abs(b - st.line) < Math.abs(a - st.line) ? b : a));
+      line.addEventListener("change", () => apply({ line: +line.value }));
+      r4.append(va, line);
+      sec.appendChild(r4);
+    }
+    sec.appendChild(colourControl("Text colour", st.color, hex => { if (hex) apply({ color: hex }); }));
   }
   sec.appendChild(colourControl(node.localName === "tc" ? "Cell fill" : "Fill", st.noFill ? null : st.fill, hex => apply({ fill: hex }), true));
   return sec;
@@ -165,6 +193,31 @@ function shapeSection(node: Element): HTMLElement | null {
     w.addEventListener("change", () => { if (setOutline(S.deck, S.cur, S.sel.obj, out.color, +w.value)) ui.refresh(); });
     sec.appendChild(w);
   }
+  return sec;
+}
+
+/** Transparency and shadow, for shapes and pictures. */
+function effectsSection(node: Element): HTMLElement | null {
+  if (node.localName !== "sp" && node.localName !== "pic") return null;
+  const isPic = node.localName === "pic";
+  if (!isPic && !dig(node, "spPr", "solidFill", "srgbClr") && !readShadow(node) && kid(kid(node, "nvSpPr"), "cNvSpPr")?.getAttribute("txBox") === "1") return null;
+  const sec = el("div", { class: "sect" });
+  sec.appendChild(el("div", { class: "sect-title" }, "Effects"));
+  if (isPic || dig(node, "spPr", "solidFill", "srgbClr")) {
+    const op = readOpacity(node);
+    const row = el("div", { class: "row tight" });
+    const range = el("input", { type: "range", min: "0", max: "100", step: "5", value: String(100 - op), "aria-label": "Transparency", style: "flex:1" });
+    const out = el("span", { class: "hint", style: "width:40px;text-align:right" }, `${Math.round(100 - op)}%`);
+    range.addEventListener("input", () => { out.textContent = `${range.value}%`; });
+    range.addEventListener("change", () => { if (setOpacity(S.deck, S.cur, S.sel.obj, 100 - +range.value)) ui.refresh(); });
+    row.append(range, out);
+    sec.append(el("span", { class: "lbl" }, "Transparency"), row);
+  }
+  const sh = el("label", { class: "check" });
+  const box = el("input", { type: "checkbox", checked: readShadow(node) });
+  box.addEventListener("change", () => { if (setShadow(S.deck, S.cur, S.sel.obj, box.checked)) ui.refresh(); });
+  sh.append(box, document.createTextNode(" Shadow"));
+  sec.appendChild(sh);
   return sec;
 }
 
@@ -282,7 +335,10 @@ export function renderInspector(): void {
   if (fs) host.appendChild(fs);
   if (textNode) host.appendChild(styleSection(textNode, cell ? "Cell style" : "Style"));
   else if (node.localName === "sp") host.appendChild(styleSection(node, "Style"));
-  if (!cell) { const sh = shapeSection(node); if (sh) host.appendChild(sh); }
+  if (!cell) {
+    const sh = shapeSection(node); if (sh) host.appendChild(sh);
+    const fx = effectsSection(node); if (fx) host.appendChild(fx);
+  }
   const arrange = arrangeSection(node);
   if (arrange) host.appendChild(arrange);
   host.scrollTop = scroll;
@@ -374,4 +430,15 @@ function multiPanel(host: HTMLElement): void {
   }
   sec.append(dist, el("span", { class: "hint" }, "Shift+click to add or remove items. Drag on an empty part of the slide to select by area."));
   host.appendChild(sec);
+}
+
+/** Ctrl+B / Ctrl+I / Ctrl+U on the selected text box or cell. */
+export function toggleStyle(k: "b" | "i" | "u"): boolean {
+  const info = S.deck.slides[S.cur];
+  if (!info || S.sel.obj === null || S.multi.length) return false;
+  const doc = parseXml(S.deck.texts[info.path]!);
+  const node = selTextNode(doc, S.sel);
+  if (!node) return false;
+  if (setStyle(S.deck, S.cur, S.sel, { [k]: !readStyle(node)[k] })) ui.refresh();
+  return true;
 }

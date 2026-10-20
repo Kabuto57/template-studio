@@ -97,7 +97,7 @@ function fillOf(deck: Deck, parent: Element | null, clrMap?: ClrMap): string | n
 interface Bullet { char?: string; auto?: string; start?: number }
 interface Props {
   algn?: string; marL?: number; indent?: number; bullet?: Bullet | null; spcBef?: number; spcAft?: number; lnSpc?: number;
-  sz?: number; b?: boolean; i?: boolean; u?: boolean; caps?: boolean; spc?: number; colorEl?: Element | null; font?: string | null;
+  sz?: number; b?: boolean; i?: boolean; u?: boolean; strike?: boolean; caps?: boolean; spc?: number; colorEl?: Element | null; font?: string | null;
   defSz?: number; defB?: boolean; defI?: boolean; defU?: boolean; defCaps?: boolean; defSpc?: number; defColorEl?: Element | null; defFont?: string | null;
 }
 function readPPr(p: Element | null): Props {
@@ -130,6 +130,7 @@ function readRPr(r: Element | null, prefix = ""): Props {
   if (r.getAttribute("b") !== null) put("b", flag("b"));
   if (r.getAttribute("i") !== null) put("i", flag("i"));
   if (r.getAttribute("u") && r.getAttribute("u") !== "none") put("u", true);
+  if (r.getAttribute("strike") && r.getAttribute("strike") !== "noStrike") put("strike", true);
   if (r.getAttribute("cap") === "all") put("caps", true);
   if (r.getAttribute("spc")) put("spc", num(r.getAttribute("spc")) / 100);
   const sf = kid(r, "solidFill");
@@ -221,6 +222,15 @@ class Painter {
   u = (emu: number): string => `${(emu / this.deck.W * 100).toFixed(4)}cqw`;
   pt = (p: number): string => `${(p * 12700 / this.deck.W * 100).toFixed(4)}cqw`;
 
+  /** An outer shadow as a CSS drop-shadow, which follows any outline (polygons, pictures). */
+  shadow(el: HTMLElement | SVGElement, spPr: Element | null, ctx: Ctx): void {
+    const sh = dig(spPr, "effectLst", "outerShdw");
+    if (!sh) return;
+    const dist = num(sh.getAttribute("dist")), dir = num(sh.getAttribute("dir")) / 60000 * Math.PI / 180;
+    const col = colorOf(this.deck, sh.firstElementChild as Element | null, ctx.clrMap) || "rgba(0,0,0,.35)";
+    el.style.filter = `drop-shadow(${this.u(dist * Math.cos(dir))} ${this.u(dist * Math.sin(dir))} ${this.u(num(sh.getAttribute("blurRad")) / 2)} ${col})`;
+  }
+
   place(el: HTMLElement | SVGElement, b: Box): void {
     el.style.left = this.u(b.x); el.style.top = this.u(b.y); el.style.width = this.u(b.cx); el.style.height = this.u(b.cy);
     if (b.rot) el.style.transform = `rotate(${b.rot}deg)`;
@@ -266,7 +276,7 @@ class Painter {
         span.style.fontSize = `calc(var(--fit, 1) * ${this.pt((st.sz ?? 18) * scale)})`;
         if (st.b) span.style.fontWeight = "700";
         if (st.i) span.style.fontStyle = "italic";
-        if (st.u) span.style.textDecoration = "underline";
+        if (st.u || st.strike) span.style.textDecoration = [st.u ? "underline" : "", st.strike ? "line-through" : ""].join(" ").trim();
         if (st.caps) span.style.textTransform = "uppercase";
         if (st.spc) span.style.letterSpacing = this.pt(st.spc);
         const col = st.colorEl ? colorOf(deck, st.colorEl, ctx.clrMap) : ctx.textColor;
@@ -422,6 +432,7 @@ class Painter {
       const r = adj ? num(adj.replace(/\D/g, ""), 16667) / 100000 : .16667;
       div.style.borderRadius = this.u(Math.min(b.cx, b.cy) * r);
     }
+    this.shadow(div, spPr, ctx);
     const txBody = kid(sp, "txBody");
     if (txBody && layer === "slide") {
       const t = phInfo?.type;
@@ -455,6 +466,9 @@ class Painter {
     if (ctx.curObj !== undefined) img.dataset.obj = String(ctx.curObj);
     img.src = url;
     img.style.objectFit = "fill";
+    const amt = el.getElementsByTagNameNS(A_NS, "alphaModFix")[0]?.getAttribute("amt");
+    if (amt) img.style.opacity = String(num(amt) / 100000);
+    this.shadow(img, kid(el, "spPr"), ctx);
     img.style.maxWidth = "none";
     this.place(img, applyTf(tf, b0));
     out.appendChild(img);

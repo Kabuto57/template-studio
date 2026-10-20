@@ -10,7 +10,7 @@ import { fillXml, isSlidePart, newReport, type Data } from "../../src/engine/eng
 import { buildExample, buildModel, buildPrompt, buildSchema, cfgKeyOf, normaliseProject, projectForCode, type Project } from "../../src/model/fields";
 import { buildPython, displayPython, parsePythonFile } from "../../src/model/python";
 import { Deck } from "../../src/ooxml/deck";
-import { BLOCKS, SHAPE_BLOCKS, addBlankSlide, alignObjs, boundsOf, copyObjs, distributeObjs, groupObjs, insertImage, moveObjs, pasteObjs, ungroupObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, alignObj, deleteObj, deleteSlide, duplicateObj, duplicateSlide, insertBlock, moveSlide, placeField, renameField, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder } from "../../src/ooxml/edit";
+import { BLOCKS, SHAPE_BLOCKS, readOpacity, readShadow, readStyle, setOpacity, setShadow, addBlankSlide, alignObjs, boundsOf, copyObjs, distributeObjs, groupObjs, insertImage, moveObjs, pasteObjs, ungroupObj, readGeom, readOutline, readRotation, setGeom, setOutline, setRotation, alignObj, deleteObj, deleteSlide, duplicateObj, duplicateSlide, insertBlock, moveSlide, placeField, renameField, setBox, setSlideBackground, setStyle, setText, slideBackground, tableOp, zOrder } from "../../src/ooxml/edit";
 import { collectEditables, collectObjects, renderSlide } from "../../src/ooxml/render";
 import { bytesToB64, b64ToBytes, parseXml } from "../../src/ooxml/xml";
 import { buildDeck } from "../../src/templates/builder";
@@ -380,6 +380,23 @@ describe("shapes, pictures and copy-paste", () => {
     const again = await Deck.load(await deck.bytes());
     expect(again.zip.has("ppt/media/image1.png")).toBe(true);
     write("shapes_and_picture.pptx", await deck.bytes());
+  });
+
+  it("formats text (underline, lists, spacing, position) and adds transparency and shadow", async () => {
+    const deck = await Deck.load(await buildDeck([{ els: [] }], blank));
+    const project = normaliseProject({ name: "Format" });
+    insertBlock(deck, project, 0, "bullets");
+    insertBlock(deck, project, 0, "box");
+    const objs = () => collectObjects(parseXml(deck.texts[deck.slides[0]!.path]!));
+    expect(setStyle(deck, 0, { obj: 0, cell: null }, { u: true, strike: true, caps: true, list: "number", line: 1.5, anchor: "ctr" })).toBe(true);
+    expect(readStyle(objs()[0]!)).toMatchObject({ u: true, strike: true, caps: true, list: "number", line: 1.5, anchor: "ctr" });
+    expect(setStyle(deck, 0, { obj: 0, cell: null }, { list: "none" })).toBe(true);
+    expect(readStyle(objs()[0]!).list).toBe("none");
+    expect(setOpacity(deck, 0, 1, 40)).toBe(true);
+    expect(readOpacity(objs()[1]!)).toBe(40);
+    expect(setShadow(deck, 0, 1, true)).toBe(true);
+    expect(readShadow(objs()[1]!)).toBe(true);
+    write("formatted.pptx", await filled(deck, buildExample(project, buildModel(deck.scan())), project));
   });
 
   it("aligns, distributes, moves, groups and ungroups several objects", async () => {

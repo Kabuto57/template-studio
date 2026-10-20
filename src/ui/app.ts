@@ -5,7 +5,7 @@ import { collectObjects } from "../ooxml/render";
 import { parseXml } from "../ooxml/xml";
 import { zipSupported } from "../zip/minizip";
 import { $, $$, ICON, el, toast } from "./dom";
-import { deleteSelected, duplicateSelected, groupSelected, renderInspector, ungroupSelected } from "./inspector";
+import { deleteSelected, duplicateSelected, groupSelected, renderInspector, toggleStyle, ungroupSelected } from "./inspector";
 import { renderCodePage, renderTestPanel } from "./outputs";
 import { downloadKit, exampleText, openFile, restoreOrSample, save } from "./project";
 import { renderInsertBar, renderSide } from "./side";
@@ -131,6 +131,7 @@ function wire(): void {
       return;
     }
     if (typing || S.view !== "design" || S.sel.obj === null) return;
+    if (mod && (key === "b" || key === "i" || key === "u") && !e.shiftKey && toggleStyle(key)) { e.preventDefault(); return; }
     if (mod && key === "g") { e.preventDefault(); if (e.shiftKey) ungroupSelected(); else groupSelected(); return; }
     const step = e.shiftKey ? GRID * 10 : GRID;
     if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSelected(); }
