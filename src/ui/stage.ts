@@ -571,3 +571,48 @@ export function wireStage(openFile: (f: File) => void): void {
 }
 
 export { BLOCKS };
+
+/* ---------------------------------------------------------------- present */
+/**
+ * Full-screen slideshow of the deck filled with the test data, like PowerPoint's Slide Show.
+ * Arrow keys, space or a click move on; Esc ends it.
+ */
+export function present(from = S.cur): void {
+  const t = parseTest();
+  const filled = t.data ? fillAll(t.data).out : null;
+  const show = el("div", { class: "show", role: "dialog", "aria-label": "Slide show", tabindex: "-1" });
+  const stage = el("div", { class: "show-stage" });
+  const count = el("div", { class: "show-count" });
+  show.append(stage, count);
+  document.body.appendChild(show);
+  let i = from;
+  const draw = () => {
+    const sl = renderSlide(S.deck, i, { xml: filled?.[S.deck.slides[i]!.path], highlight: !filled });
+    sl.classList.add("show-slide");
+    stage.replaceChildren(sl);
+    stage.style.setProperty("--ar", String(S.deck.W / S.deck.H));
+    if (!filled) fitPlaceholderBoxes(sl);
+    count.textContent = `${i + 1} / ${S.deck.slides.length}${filled ? "" : " \u00B7 fields shown, test data isn't valid JSON"}`;
+  };
+  const end = () => {
+    show.remove();
+    document.removeEventListener("keydown", key, true);
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => { /* already out */ });
+  };
+  const go = (d: number) => { const n = i + d; if (n < 0) return; if (n >= S.deck.slides.length) return end(); i = n; draw(); };
+  const key = (e: KeyboardEvent) => {
+    if (["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"].includes(e.key)) { e.preventDefault(); go(1); }
+    else if (["ArrowLeft", "ArrowUp", "PageUp", "Backspace"].includes(e.key)) { e.preventDefault(); go(-1); }
+    else if (e.key === "Home") { i = 0; draw(); }
+    else if (e.key === "End") { i = S.deck.slides.length - 1; draw(); }
+    else if (e.key === "Escape") { e.preventDefault(); end(); }
+    e.stopPropagation();
+  };
+  document.addEventListener("keydown", key, true);
+  show.addEventListener("click", e => go(e.clientX < innerWidth / 4 ? -1 : 1));
+  show.addEventListener("contextmenu", e => { e.preventDefault(); go(-1); });
+  document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && show.isConnected) end(); });
+  draw();
+  show.focus();
+  void show.requestFullscreen?.().catch(() => { /* a window-sized show is fine too */ });
+}

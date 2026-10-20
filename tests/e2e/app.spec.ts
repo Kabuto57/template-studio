@@ -450,3 +450,16 @@ test("double-click a text box to type on the slide", async ({ page }) => {
   await page.click("#undoBtn");
   await expect(page.locator("#mainSlide")).not.toContainText("Typed in place");
 });
+
+test("present the filled deck full screen, and step through it", async ({ page }) => {
+  await open(page);
+  await page.click("[data-design=brief]");
+  await page.click("#presentBtn");
+  await expect(page.locator(".show .slide")).toBeVisible();
+  await expect(page.locator(".show-count")).toHaveText("1 / 3");
+  await expect(page.locator(".show .slide")).toContainText("Move SME onboarding fully online");
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".show-count")).toHaveText("2 / 3");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".show")).toHaveCount(0);
+});

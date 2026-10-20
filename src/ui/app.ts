@@ -9,7 +9,7 @@ import { copyStyle, pasteStyle, deleteSelected, duplicateSelected, groupSelected
 import { renderCodePage, renderTestPanel } from "./outputs";
 import { downloadKit, exampleText, openFile, restoreOrSample, save } from "./project";
 import { renderInsertBar, renderSide } from "./side";
-import { doInsertImage, drawOverlay, renderStage, wireStage } from "./stage";
+import { doInsertImage, drawOverlay, present, renderStage, wireStage } from "./stage";
 import { S, clearSel, selected, ui, type SideTab, type View } from "./state";
 
 declare const __APP_VERSION__: string;
@@ -96,7 +96,7 @@ function openAbout(keys = false): void {
       ${[["Ctrl+Z / Ctrl+Shift+Z", "Undo / redo"], ["Ctrl+C, X, V", "Copy, cut, paste (also screenshots)"], ["Ctrl+D", "Duplicate"], ["Ctrl+A", "Select everything on the slide"],
         ["Shift+click, or drag a box", "Select several"], ["Ctrl+G / Ctrl+Shift+G", "Group / ungroup"], ["Ctrl+B, I, U", "Bold, italic, underline"],
         ["Arrow keys (Shift for bigger steps)", "Nudge"], ["Alt while dragging", "Place without snapping"], ["Shift while resizing", "Keep proportions"],
-        ["Ctrl+= / Ctrl+- / Ctrl+0", "Zoom in / out / fit"], ["Double-click text", "Type on the slide"], ["Ctrl+Alt+C / Ctrl+Alt+V", "Copy / paste style"], ["Delete", "Remove"], ["Esc", "Deselect"], ["Right-click", "More actions"], ["?", "This list"]]
+        ["Ctrl+= / Ctrl+- / Ctrl+0", "Zoom in / out / fit"], ["Double-click text", "Type on the slide"], ["Ctrl+Alt+C / Ctrl+Alt+V", "Copy / paste style"], ["F5 / Shift+F5", "Present from the start / this slide"], ["Delete", "Remove"], ["Esc", "Deselect"], ["Right-click", "More actions"], ["?", "This list"]]
         .map(([k, v]) => `<dt><kbd>${k}</kbd></dt><dd>${v}</dd>`).join("")}</dl></details>
     <footer><span>Version ${__APP_VERSION__} · <a href="${REPO_URL}" target="_blank" rel="noopener">Source on GitHub</a></span>
     <button class="btn primary" type="button" id="aboutClose">Close</button></footer></div>`;
@@ -126,6 +126,7 @@ function wire(): void {
   $("#aboutBtn").addEventListener("click", () => openAbout());
   $("#nextBtn").addEventListener("click", () => setView(S.view === "design" ? "test" : "code"));
   $("#kitBtn").addEventListener("click", () => void downloadKit());
+  $("#presentBtn").addEventListener("click", () => present(S.view === "code" ? 0 : S.cur));
   $("#openBtn").addEventListener("click", () => $("#fileInput").click());
   $("#aboutDialog").addEventListener("click", e => { if (e.target === e.currentTarget) (e.currentTarget as HTMLDialogElement).close(); });
   const name = $<HTMLInputElement>("#projName");
@@ -149,6 +150,7 @@ function wire(): void {
     if (mod && key === "z" && !typing) { e.preventDefault(); undoRedo(e.shiftKey ? "redo" : "undo"); return; }
     if (mod && key === "y" && !typing) { e.preventDefault(); undoRedo("redo"); return; }
     if (mod && !typing && S.view !== "code" && (e.key === "=" || e.key === "+" || e.key === "-" || e.key === "0")) { e.preventDefault(); setZoom(e.key === "0" ? 0 : e.key === "-" ? -1 : 1); return; }
+    if (e.key === "F5" && S.view !== "code") { e.preventDefault(); present(e.shiftKey ? S.cur : 0); return; }
     if (!typing && e.key === "?") { e.preventDefault(); openAbout(true); return; }
     if (!typing && S.view === "design" && mod && key === "a") {
       e.preventDefault();
